@@ -6,7 +6,8 @@
   "scripts": {
     "compile": "webpack",
     "build": "webpack -p",
-    "start": "node server.js"
+    "start": "node server.js",
+    "deploy": "npm run-script build && surge -p www"
   },
   "keywords": [
     "react",
