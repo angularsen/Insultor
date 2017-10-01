@@ -98,6 +98,7 @@ class Component extends React.Component
 
         this.setState({ isPlaying: true })   
         console.log('Starting video...OK.');
+        setTimeout(() => this.takepicture(), 1000);
     })
     .catch((err) => {
         console.error("Starting video...FAILED!", err);
