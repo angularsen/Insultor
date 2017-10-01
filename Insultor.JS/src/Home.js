@@ -16,20 +16,15 @@ class Component extends React.Component
   constructor() {
     super();
 
-    // this.width = 320;    // We will scale the photo width to this
-    // this.height = 0;     // This will be computed based on the input stream
-    // this.streaming = false;
+    this.videoStream = undefined;
     this.video = undefined;
     this.canvas = undefined;
-    this.photo = undefined;
 
     this.state = {
       videoSrc: undefined,
       width: 320, // We will scale the photo width to this
       height: 0, // This will be computed based on the input stream
       photoSrc: undefined // Taken photo as an URL with data embedded
-      // videoWidth: undefined,
-      // videoHeight: undefined
     };
 
     this.initVideo = this.initVideo.bind(this);
@@ -49,10 +44,11 @@ class Component extends React.Component
       <div>
         <h1>Insult my Face!</h1>
         <div className="camera">
-          <video style={{border: '1px solid lightgrey'}} id="video" ref={this.initVideo} width={width} height={height}>Video stream not available.</video>
+          <video style={{ border: '1px solid lightgrey' }} id="video" ref={this.initVideo} width={width} height={height} onCanPlay={ev => this._videoOnCanPlay(ev)}>Video stream not available.</video>
         </div>
         <div>
-          <button style={{padding: '.5em'}} onClick={ev => this._onStartButtonClick(ev)}>Take photo</button>
+          <button style={{padding: '1em'}} onClick={ev => this._takePhotoOnClick(ev)}>Take photo</button>
+          <button style={{padding: '1em'}} onClick={ev => this._startStopOnClick(ev)}>Start/Stop</button>
         </div>
         <canvas style={{border: '1px solid lightgrey'}} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
@@ -73,34 +69,64 @@ class Component extends React.Component
     );
   }
 
+  _videoOnCanPlay(ev) {
+    const video = ev.target;
+
+    console.log('Video ready to play. Calculating output height.');
+
+    // Scale height to achieve same aspect ratio for whatever our rendered width is
+    const height = video.videoHeight / (video.videoWidth / this.state.width);
+    this.setState({ height })   
+  }
+
   initVideo(video) {
     this.video = video;
     if (!video) return;
 
-    video.addEventListener('canplay', (ev) => {
-      if (!this.state.streaming) {
-        // Scale height to achieve same aspect ratio for whatever our rendered width is
-        const height = video.videoHeight / (video.videoWidth / this.state.width);
-        this.setState({ streaming: true, height });
-      }
-    }, false);
+    console.log('Starting video on load.')
+    this.startVideo(video);
+  }
 
-    console.log('Requesting video...')
+  startVideo(video) {
+    console.log('Starting video...');
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then((stream) => {
       console.log('Requesting video...OK!')
+        this.videoStream = stream;
         video.srcObject = stream;
         video.play();
+
+        this.setState({ isPlaying: true })   
+        console.log('Starting video...OK.');
     })
     .catch((err) => {
-        console.error("Requesting video...FAILED!", err);
+        console.error("Starting video...FAILED!", err);
         alert('Could not access video.\n\nSee console for details.');
     });
   }
 
-  _onStartButtonClick(ev) {
+  stopVideo(video) {
+    console.log('Stopping video...');
+    this.videoStream.getVideoTracks()[0].stop();
+    video.pause();
+    video.src = "";
+    this.setState({ isPlaying: false })   
+    console.log('Stopping video...OK.');
+  }
+
+  _takePhotoOnClick(ev) {
       ev.preventDefault();
       this.takepicture();
+  }
+
+  _startStopOnClick(ev) {
+      ev.preventDefault();
+
+      if (this.state.isPlaying) {
+        this.stopVideo(this.video);
+      } else {
+        this.startVideo(this.video);
+      }
   }
 
   initCanvas(canvas) {
