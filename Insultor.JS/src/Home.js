@@ -43,6 +43,10 @@ class Component extends React.Component
     // if (!width && !height)
     console.log('Render');
 
+    const takePhotoButtonDisabled = !this.state.isPlaying;
+    const startStopButtonText = this.state.isPlaying ? 'Stop' : 'Start';
+    const buttonStyle = { padding: '1em', minWidth: '6em' };
+
     return (
       <div>
         <h1>Insult my Face!</h1>
@@ -50,8 +54,8 @@ class Component extends React.Component
           <video style={{ border: '1px solid lightgrey' }} id="video" ref={this.initVideo} width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
         </div>
         <div>
-          <button style={{padding: '1em'}} onClick={ev => this.takePhotoOnClick(ev)}>Take photo</button>
-          <button style={{padding: '1em'}} onClick={ev => this.startStopOnClick(ev)}>Start/Stop</button>
+          <button style={buttonStyle} onClick={ev => this.takePhotoOnClick(ev)} disabled={takePhotoButtonDisabled}>Take photo</button>
+          <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
         </div>
         <canvas style={{border: '1px solid lightgrey'}} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
