@@ -11,6 +11,9 @@ const params = {
   "returnFaceAttributes": "age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise",
 };
 
+// Free API supports 20 requests / minute => minimum 3 second periods
+const FACE_API_THROTTLE_MS = 4000;
+
 class Component extends React.Component
 {
   constructor() {
@@ -44,11 +47,11 @@ class Component extends React.Component
       <div>
         <h1>Insult my Face!</h1>
         <div className="camera">
-          <video style={{ border: '1px solid lightgrey' }} id="video" ref={this.initVideo} width={width} height={height} onCanPlay={ev => this._videoOnCanPlay(ev)}>Video stream not available.</video>
+          <video style={{ border: '1px solid lightgrey' }} id="video" ref={this.initVideo} width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
         </div>
         <div>
-          <button style={{padding: '1em'}} onClick={ev => this._takePhotoOnClick(ev)}>Take photo</button>
-          <button style={{padding: '1em'}} onClick={ev => this._startStopOnClick(ev)}>Start/Stop</button>
+          <button style={{padding: '1em'}} onClick={ev => this.takePhotoOnClick(ev)}>Take photo</button>
+          <button style={{padding: '1em'}} onClick={ev => this.startStopOnClick(ev)}>Start/Stop</button>
         </div>
         <canvas style={{border: '1px solid lightgrey'}} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
@@ -69,14 +72,14 @@ class Component extends React.Component
     );
   }
 
-  _videoOnCanPlay(ev) {
+  videoOnCanPlay(ev) {
     const video = ev.target;
 
     console.log('Video ready to play. Calculating output height.');
 
     // Scale height to achieve same aspect ratio for whatever our rendered width is
     const height = video.videoHeight / (video.videoWidth / this.state.width);
-    this.setState({ height })   
+    this.setState({ height })
   }
 
   initVideo(video) {
@@ -96,9 +99,9 @@ class Component extends React.Component
         video.srcObject = stream;
         video.play();
 
-        this.setState({ isPlaying: true })   
+        this.setState({ isPlaying: true })
         console.log('Starting video...OK.');
-        setTimeout(() => this.takepicture(), 1000);
+        this.periodicallyAnalyzeFaceAsync(FACE_API_THROTTLE_MS);
     })
     .catch((err) => {
         console.error("Starting video...FAILED!", err);
@@ -111,16 +114,16 @@ class Component extends React.Component
     this.videoStream.getVideoTracks()[0].stop();
     video.pause();
     video.src = "";
-    this.setState({ isPlaying: false })   
+    this.setState({ isPlaying: false })
     console.log('Stopping video...OK.');
   }
 
-  _takePhotoOnClick(ev) {
+  takePhotoOnClick(ev) {
       ev.preventDefault();
-      this.takepicture();
+      this.analyzeFaceInCurrentVideoStreamAsync();
   }
 
-  _startStopOnClick(ev) {
+  startStopOnClick(ev) {
       ev.preventDefault();
 
       if (this.state.isPlaying) {
@@ -148,12 +151,28 @@ class Component extends React.Component
     this.setState({photoSrc: data});
   }
 
-  takepicture() {
-    console.log('Take photo');
-    const { width, height } = this.state;
-    const canvas = this.canvas;
-    const context = canvas.getContext('2d');
-    if (width && height) {
+  async periodicallyAnalyzeFaceAsync(periodMs) {
+    console.debug('periodicallyAnalyzeFaceAsync()')
+    if (this.state.isPlaying) {
+      // Only analyze if actually streaming video
+      await this.analyzeFaceInCurrentVideoStreamAsync();
+    }
+    setTimeout(() => this.periodicallyAnalyzeFaceAsync(periodMs), periodMs);
+  }
+
+  async analyzeFaceInCurrentVideoStreamAsync() {
+    try {
+      console.log('Analyzing face...');
+      const { width, height } = this.state;
+      const canvas = this.canvas;
+      const context = canvas.getContext('2d');
+
+      if (!width || !height) {
+        console.log('Width or height not set, clearing photo.')
+        this.clearphoto();
+        return;
+      }
+
       canvas.width = width;
       canvas.height = height;
       context.drawImage(video, 0, 0, width, height);
@@ -162,21 +181,17 @@ class Component extends React.Component
       this.setState({ photoSrc: imageDataUrl });
 
       const imageData = context.getImageData(0, 0, width, height);
-      this.analyzeFace(imageDataUrl);
-      //  createImageBitmap(canvas, 0, 0, width, height)
-      //  .then(imageBitmap => {
-      //    console.log('Image bitmap created. Uploading to Face API...');
-      //    this.analyzeFace(imageBitmap);
-      //  })
-      //  .catch(err => console.error('Failed to create image bitmap.', err));
-    } else {
-      console.log('No width/height yet, clearing photo.')
-      this.clearphoto();
+      await this.analyzeFaceAsync(imageDataUrl);
+
+      console.log('Analyzing face...OK.');
+    } catch (err) {
+      console.error('Failed to analyze face.');
     }
   }
 
-  // args: CanvasRenderingContext2D.getImageData()
-  analyzeFace(imageDataUrl) {
+  // Promise
+  analyzeFaceAsync(imageDataUrl) {
+    console.log('analyzeFaceAsync');
     // Perform the REST API call.
     const url = `${faceApiEndpoint}?returnFaceId=${params.returnFaceId}&returnFaceAttributes=${params.returnFaceAttributes}&returnFaceLandmarks=${params.returnFaceLandmarks}`;
     const headers = new Headers();
@@ -185,14 +200,29 @@ class Component extends React.Component
 
     const body = this.makeblob(imageDataUrl);
 
-    fetch(url,
+    return fetch(url,
       {
         method: 'POST',
         headers,
         body
       })
-      .then(res => {
-        if (!res.ok) throw new Error('Request failed', res);
+      .then(async res => {
+        if (!res.ok) {
+          switch (res.status){
+            case 429: {
+              const err = new Error('Rate limit exceeded.');
+              err.response = res;
+              err.responseBody = await res.json();
+              throw err;
+            }
+            default: {
+              const err = new Error(`Request failed with status ${res.status} ${res.statusText}`);
+              err.response = res;
+              err.responseBody = await res.json();
+              throw err;
+            }
+          }
+        }
         return res.json();
       })
       .then(resBody => {
@@ -208,6 +238,7 @@ class Component extends React.Component
       });
   }
 
+  // Convert a data URL to a file blob for POST request
   makeblob(dataURL) {
     var BASE64_MARKER = ';base64,';
     if (dataURL.indexOf(BASE64_MARKER) == -1) {
@@ -231,6 +262,8 @@ class Component extends React.Component
   }
 
   getJoke(faceAnalysis) {
+    if (faceAnalysis === undefined) return 'No joke for you!';
+
     const { faceAttributes } = faceAnalysis;
     const { smile, gender, age, facialHair, glasses, emotion, hair } = faceAttributes;
     const { bald, invisible, hairColor } = hair;
