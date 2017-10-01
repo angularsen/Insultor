@@ -22,7 +22,6 @@ class Component extends React.Component
     this.video = undefined;
     this.canvas = undefined;
     this.photo = undefined;
-    this.startButton = undefined;
 
     this.state = {
       videoSrc: undefined,
@@ -53,7 +52,7 @@ class Component extends React.Component
           <video style={{border: '1px solid lightgrey'}} id="video" ref={this.initVideo} width={width} height={height}>Video stream not available.</video>
         </div>
         <div>
-          <button id="startbutton" onClick={ev => this._onStartButtonClick(ev)}>Take photo</button>
+          <button style={{padding: '.5em'}} onClick={ev => this._onStartButtonClick(ev)}>Take photo</button>
         </div>
         <canvas style={{border: '1px solid lightgrey'}} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
