@@ -2,6 +2,7 @@ const path = require('path');
 
 module.exports = {
   context: path.join(__dirname, 'src'),
+  devtool: 'source-map',
   entry: [
     './index.js',
   ],
@@ -15,10 +16,7 @@ module.exports = {
         test: /\.js$/,
         exclude: /node_modules/,
         use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['env']
-          }
+          loader: 'babel-loader'
         }
       },
     ],

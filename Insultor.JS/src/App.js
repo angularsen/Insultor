@@ -15,7 +15,7 @@ const navBarListStyle = {
 
 const navBarItemStyle = {
   float: 'left',
-  minWidth: '13em',
+  minWidth: '8em',
   borderRight: '1px solid #999'
 };
 
@@ -51,7 +51,7 @@ const Header = () => (
 );
 
 const Main = () => (
-  <main>
+  <main style={{padding: '.5em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
     <Switch>
       <Route exact path='/' component={Home}/>
       <Route path='/about' component={About}/>
