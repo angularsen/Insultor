@@ -1,6 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
+import Speech from './services/Speech';
+import JokeProvider from './services/JokeProvider';
+
+const speech = new Speech();
 const faceApiSubscriptionKey = '93a68a5ab7d94ca0984fea54a332ad89';
 const faceApiEndpoint = 'https://westcentralus.api.cognitive.microsoft.com/face/v1.0/detect';
 
@@ -14,8 +18,7 @@ const params = {
 // Free API supports 20 requests / minute => minimum 3 second periods
 const FACE_API_THROTTLE_MS = 4000;
 
-class Component extends React.Component
-{
+class Component extends React.Component {
   constructor() {
     super();
 
@@ -56,12 +59,13 @@ class Component extends React.Component
         <div>
           <button style={buttonStyle} onClick={ev => this.takePhotoOnClick(ev)} disabled={takePhotoButtonDisabled}>Take photo</button>
           <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
+          <button style={buttonStyle} onClick={ev => this.speakRandomJoke(ev)}>Insult me now!</button>
         </div>
-        <canvas style={{border: '1px solid lightgrey'}} id="canvas" ref={this.initCanvas} width={width} height={height}>
+        <canvas style={{ border: '1px solid lightgrey' }} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
         <div className="output">
-          { /* TODO REMOVE THIS */ }
-          <img id="photo" style={{display: 'none'}} src={this.state.photoSrc} alt="The screen capture will appear in this box." />
+          { /* TODO REMOVE THIS */}
+          <img id="photo" style={{ display: 'none' }} src={this.state.photoSrc} alt="The screen capture will appear in this box." />
         </div>
         <p>
           {this.state.joke ? this.state.joke : ''}
@@ -90,15 +94,15 @@ class Component extends React.Component
     this.video = video;
     if (!video) return;
 
-    console.log('Starting video on load.')
-    this.startVideo(video);
+    // console.log('Starting video on load.')
+    // this.startVideo(video);
   }
 
   startVideo(video) {
     console.log('Starting video...');
     navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    .then((stream) => {
-      console.log('Requesting video...OK!')
+      .then((stream) => {
+        console.log('Requesting video...OK!')
         this.videoStream = stream;
         video.srcObject = stream;
         video.play();
@@ -106,11 +110,11 @@ class Component extends React.Component
         this.setState({ isPlaying: true })
         console.log('Starting video...OK.');
         this.periodicallyAnalyzeFaceAsync(FACE_API_THROTTLE_MS);
-    })
-    .catch((err) => {
+      })
+      .catch((err) => {
         console.error("Starting video...FAILED!", err);
         alert('Could not access video.\n\nSee console for details.');
-    });
+      });
   }
 
   stopVideo(video) {
@@ -123,18 +127,18 @@ class Component extends React.Component
   }
 
   takePhotoOnClick(ev) {
-      ev.preventDefault();
-      this.analyzeFaceInCurrentVideoStreamAsync();
+    ev.preventDefault();
+    this.analyzeFaceInCurrentVideoStreamAsync();
   }
 
   startStopOnClick(ev) {
-      ev.preventDefault();
+    ev.preventDefault();
 
-      if (this.state.isPlaying) {
-        this.stopVideo(this.video);
-      } else {
-        this.startVideo(this.video);
-      }
+    if (this.state.isPlaying) {
+      this.stopVideo(this.video);
+    } else {
+      this.startVideo(this.video);
+    }
   }
 
   initCanvas(canvas) {
@@ -152,7 +156,7 @@ class Component extends React.Component
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     const data = canvas.toDataURL('image/png');
-    this.setState({photoSrc: data});
+    this.setState({ photoSrc: data });
   }
 
   async periodicallyAnalyzeFaceAsync(periodMs) {
@@ -212,7 +216,7 @@ class Component extends React.Component
       })
       .then(async res => {
         if (!res.ok) {
-          switch (res.status){
+          switch (res.status) {
             case 429: {
               const err = new Error('Rate limit exceeded.');
               err.response = res;
@@ -265,44 +269,11 @@ class Component extends React.Component
     return new Blob([uInt8Array], { type: contentType });
   }
 
-  getJoke(faceAnalysis) {
-    if (faceAnalysis === undefined) return 'No joke for you!';
-
-    const { faceAttributes } = faceAnalysis;
-    const { smile, gender, age, facialHair, glasses, emotion, hair } = faceAttributes;
-    const { bald, invisible, hairColor } = hair;
-    const moustacheJoke = facialHair && facialHair.moustache && facialHair.moustache >= 0.5 ? `Do you know the difference between a moustache and a gay moustache? The smell!` : undefined;
-    const beardJoke = facialHair && facialHair.beard && facialHair.beard >= 0.5 ? `Who shaves 10 times a day and still has a beard? The barber.` : undefined;
-    const hairJoke = hairColor && hairColor.length > 0 ? `Am I seeing some grey spots inside that lush, ${hairColor[0].color} noggin?` : undefined;
-    const emotionJoke = emotion && emotion.neutral >= 0.9
-    ? `Lookin'.. neutral bro!`
-    : emotion.anger >= 0.6
-      ? `Whoa.. why so angry mister?`
-      : emotion.happiness >= 0.6
-        ? `Happy, so happy! I'm so happy today!`
-        : undefined;
-
-    const glassesJoke = this.getGlassesJoke(glasses);
-
-    const jokes = [moustacheJoke, beardJoke, hairJoke, emotionJoke, glassesJoke].filter(joke => joke !== undefined);
-    return jokes.join('<br />');
+  speakRandomJoke() {
+    // const joke = new JokeProvider().randomJoke();
+    speech.speak('Well, hello there!');
   }
 
-  getGlassesJoke(glasses){
-    switch (glasses) {
-      case 'ReadingGlasses':
-        return 'I was elected to LEAD, not to READ.';
-
-      case 'Sunglasses':
-        return 'Dude, drop the sunglasses. It\'s not SUNNY inside!';
-
-      case 'SwimmingGoggles':
-        return 'Swimming goggles... really? REALLY!?';
-
-      default:
-        return undefined;
-    }
-  }
 
 }
 export default Component;
