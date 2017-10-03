@@ -22,10 +22,10 @@ class Speech {
 
 			// Note: some voices don't support altering params
 			if (opts) {
+				utter.rate = opts.rate || defaultRate;
+				utter.pitch = opts.pitch || defaultPitch;
 				if (opts.voiceURI) { utter.voiceURI = opts.voiceURI; }
 				if (opts.volume) { utter.volume = opts.volume; }
-				if (opts.rate) { utter.rate = opts.rate; }
-				if (opts.pitch) { utter.pitch = opts.pitch; }
 				if (opts.lang) { utter.lang = opts.lang; }
 			}
 

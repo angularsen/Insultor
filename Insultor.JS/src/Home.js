@@ -60,6 +60,8 @@ class Component extends React.Component {
           <button style={buttonStyle} onClick={ev => this.takePhotoOnClick(ev)} disabled={takePhotoButtonDisabled}>Take photo</button>
           <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
           <button style={buttonStyle} onClick={ev => this.speakRandomJoke(ev)}>Insult me now!</button>
+          <button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning(ev)}>Wifey appears in the morning</button>
+          <button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning(ev)}>The big chief appears in the morning</button>
         </div>
         <canvas style={{ border: '1px solid lightgrey' }} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
@@ -68,7 +70,7 @@ class Component extends React.Component {
           <img id="photo" style={{ display: 'none' }} src={this.state.photoSrc} alt="The screen capture will appear in this box." />
         </div>
         <p>
-          {this.state.joke ? this.state.joke : ''}
+          {this.state.textToSpeak ? this.state.textToSpeak : ''}
         </p>
         <p>
           {this.state.faceAnalysis ? JSON.stringify(this.state.faceAnalysis) : ''}
@@ -237,7 +239,7 @@ class Component extends React.Component {
         console.log('Face image was successfully analyzed.', resBody);
         const faceAnalysis = resBody[0]; // Array of analyses, per person?
         const joke = this.getJoke(faceAnalysis);
-        this.setState({ faceAnalysis, joke });
+        this.setState({ faceAnalysis, textToSpeak: joke });
       })
       .catch(err => {
         // Display error message.
@@ -274,9 +276,21 @@ class Component extends React.Component {
     this.speak(joke);
   }
 
-  speak(msg) {
-    this.setState({ joke: msg });
+  speak(msg, opts) {
+    this.setState({ textToSpeak: msg, speakOpts: opts });
     speech.speak(msg);
+  }
+
+  didWifeyAppearAndItIsMorning(buttonClickEvent) {
+    console.info('Wifey appeared and it is morning.')
+    const text = new JokeProvider().randomWifeyMorningCompliment();
+    this.speak(text, { theme: 'romantic' })
+  }
+
+  onBigChiefAppearAnItIsdMorning(buttonClickEvent) {
+    console.info('The big chief appeared and it is morning.')
+    const text = new JokeProvider().randomWifeyMorningCompliment();
+    this.speak(text, { theme: 'heroic' })
   }
 
 }
