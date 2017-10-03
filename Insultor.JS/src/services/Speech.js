@@ -1,8 +1,8 @@
-// Normal-paced speech, rough dark voice
+// Normal-paced speech
 const defaultOpts = {
-	voiceURI: 'Microsoft David Desktop - English (United States)',
-	rate: 1.6,
-	pitch: 0.15
+	// voiceURI: 'Microsoft David Desktop - English (United States)',
+	rate: 1.6
+	// pitch: 0.15
 };
 
 class Speech {

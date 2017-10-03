@@ -4,6 +4,11 @@ import ReactDOM from 'react-dom';
 import Speech from './services/Speech';
 import DiffCamEngine from './services/diff-cam-engine.js';
 
+const MotionThreshold = 100;  // Motion detected if frame.score value is greater than this
+const InitialDetectionDurationMs = 500;
+const MaxInitialDetectionGapMs = 500;
+const MaxPresenceDetectionGapMs = 5000; // Once present, be lenient about person standing still for a few seconds
+
 const speech = new Speech();
 
 class Component extends React.Component {
@@ -99,19 +104,7 @@ class Component extends React.Component {
   }
 
   _onDiffCamFrame(frame) {
-    const MotionThreshold = 100;  // Motion detected if frame.score value is greater than this
-    const InitialDetectionDurationMs = 1000;
-    const MaxInitialDetectionGapMs = 500;
-    const MaxPresenceDetectionGapMs = 5000; // Once present, be lenient about person standing still for a few seconds
-
     const isMotionDetected = frame.score > MotionThreshold;
-    // this.detectionBuffer.push({
-    //   epoch: new Date().getTime(),
-    //   detected: isMotionDetected
-    // });
-
-    // if (_.last(this.detectionBuffer).epoch - _.first(this.detectionBuffer) < )
-    // const frameTimePeriodMs = new Date() - this.prevFrameOn;
 
     switch (this.state.detectionState){
       case 'not present': {
