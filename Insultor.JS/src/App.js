@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Link, Route, Switch } from 'react-router-dom';
 
 import Home from './Home';
+import DiffCam from './DiffCam';
 import About from './About';
 
 const navBarListStyle = {
@@ -43,6 +44,7 @@ const Header = () => (
     <nav>
       <ul style={navBarListStyle}>
         <li style={navBarItemStyle}><Link style={navBarLogoLinkStyle} to='/'><img style={navBarLogoStyle} src="img/logo-50p-square-white-trans.png" /></Link></li>
+        <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/diffcam'>DiffCam</Link></li>
         <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/about'>About</Link></li>
       </ul>
     </nav>
@@ -54,6 +56,7 @@ const Main = () => (
   <main style={{padding: '.5em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
     <Switch>
       <Route exact path='/' component={Home}/>
+      <Route exact path='/diffcam' component={DiffCam}/>
       <Route path='/about' component={About}/>
     </Switch>
   </main>

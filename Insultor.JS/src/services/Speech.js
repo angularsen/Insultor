@@ -1,6 +1,9 @@
-const defaultVoiceURI = 'Microsoft Zira Desktop - English (United States)';
-const defaultRate = 1.7; // Normal-paced speech
-const defaultPitch = 0.2; // Rough, dark voice
+// Normal-paced speech, rough dark voice
+const defaultOpts = {
+	voiceURI: 'Microsoft David Desktop - English (United States)',
+	rate: 1.6,
+	pitch: 0.15
+};
 
 class Speech {
 	constructor() {
@@ -16,22 +19,13 @@ class Speech {
 
 		return new Promise((resolve, reject) => {
 			var utter = new SpeechSynthesisUtterance();
-			utter.text = text;
-
-			if (this.voice) { utter.voice = this.voice; }
 
 			// Note: some voices don't support altering params
-			if (opts) {
-				utter.rate = opts.rate || defaultRate;
-				utter.pitch = opts.pitch || defaultPitch;
-				if (opts.voiceURI) { utter.voiceURI = opts.voiceURI; }
-				if (opts.volume) { utter.volume = opts.volume; }
-				if (opts.lang) { utter.lang = opts.lang; }
-			}
+			Object.assign(utter, defaultOpts, opts, { text });
 
-			utter.onerror = (_, ev) => { 
+			utter.onerror = (_, ev) => {
 				console.error('Speech failed: ' + utter.msg, utter, ev);
-				reject(err); 
+				reject(err);
 			}
 
 			utter.onend = (_, ev) => {
