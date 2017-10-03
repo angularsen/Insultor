@@ -1,16 +1,22 @@
 const defaultVoiceURI = 'Microsoft Zira Desktop - English (United States)';
+const defaultRate = 1.7; // Normal-paced speech
+const defaultPitch = 0.2; // Rough, dark voice
 
 class Speech {
 	constructor() {
+		const canSpeak = 'speechSynthesis' in window;
+		if (!canSpeak) {
+			alert('Text to speech not available on this device.');
+		}
 		const localVoices = window.speechSynthesis.getVoices().filter(v => v.localService);
 		this.voice = localVoices.find(v => v.voiceURI === defaultVoiceURI) || localVoices[0] || undefined; // Fall back to default
 	}
 
-	speak(msg, opts) {
+	speak(text, opts) {
 
 		return new Promise((resolve, reject) => {
 			var utter = new SpeechSynthesisUtterance();
-			utter.msg = msg;
+			utter.text = text;
 
 			if (this.voice) { utter.voice = this.voice; }
 
@@ -33,7 +39,7 @@ class Speech {
 				resolve(ev);
 			};
 
-			speechSynthesis.speak(utter);
+			window.speechSynthesis.speak(utter);
 		});
 	}
 }

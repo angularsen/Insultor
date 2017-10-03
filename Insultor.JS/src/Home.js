@@ -270,10 +270,14 @@ class Component extends React.Component {
   }
 
   speakRandomJoke() {
-    // const joke = new JokeProvider().randomJoke();
-    speech.speak('Well, hello there!');
+    const joke = new JokeProvider().randomJoke();
+    this.speak(joke);
   }
 
+  speak(msg) {
+    this.setState({ joke: msg });
+    speech.speak(msg);
+  }
 
 }
 export default Component;

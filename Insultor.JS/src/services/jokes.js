@@ -5,7 +5,7 @@ export const jokes = {
   ],
 
   // beard: number
-  beard: beard => [
+  beard: (beard: number) => [
     `Who shaves 10 times a day and still has a beard? The barber.`
   ],
 
@@ -44,3 +44,5 @@ export const jokes = {
   }
 
 };
+
+export default jokes;
