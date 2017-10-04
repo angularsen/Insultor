@@ -96,7 +96,7 @@ class Component extends React.Component {
       DiffCamEngine.init({
         video: this.video,
         motionCanvas: this.canvas,
-        captureIntervalTime: 50,
+        captureIntervalTime: 200,
         captureCallback: this._onDiffCamFrame,
         initSuccessCallback: () => DiffCamEngine.start()
       });
