@@ -4,6 +4,7 @@ import { Link, Route, Switch } from 'react-router-dom';
 
 import Home from './Home';
 import DiffCam from './DiffCam';
+import IdentifyOnPresence from './IdentifyOnPresence';
 import About from './About';
 
 const navBarListStyle = {
@@ -45,6 +46,7 @@ const Header = () => (
       <ul style={navBarListStyle}>
         <li style={navBarItemStyle}><Link style={navBarLogoLinkStyle} to='/'><img style={navBarLogoStyle} src="img/logo-50p-square-white-trans.png" /></Link></li>
         <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/diffcam'>DiffCam</Link></li>
+        <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/identify-on-presence'>Identify on Presence</Link></li>
         <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/about'>About</Link></li>
       </ul>
     </nav>
@@ -57,6 +59,7 @@ const Main = () => (
     <Switch>
       <Route exact path='/' component={Home}/>
       <Route exact path='/diffcam' component={DiffCam}/>
+      <Route exact path='/identify-on-presence' component={IdentifyOnPresence}/>
       <Route path='/about' component={About}/>
     </Switch>
   </main>
