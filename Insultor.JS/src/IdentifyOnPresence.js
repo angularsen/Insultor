@@ -8,6 +8,9 @@ import PresenceDetector from './services/PresenceDetector';
 import { STATE_PRESENT, STATE_NOT_PRESENT } from './services/PresenceDetector';
 import DiffCamEngine from './services/diff-cam-engine';
 
+const STATE_FACE_DETECTED = 'face detected';
+const STATE_PERSON_IDENTIFIED = 'person identified';
+
 const PERSONGROUPID_WEBSTEPTRD = 'insultor-webstep-trd';
 
 const speech = new Speech();
@@ -52,11 +55,9 @@ class Component extends React.Component {
       <div>
         <h1>Identify on presence</h1>
         <h3>{person ? `Hi ${person.name}` : ''}</h3>
+        <h3>State: {this.state.detectionState}</h3>
         <div className="camera">
           <video style={{ border: '1px solid lightgrey' }} id="video" ref={this._initVideo} width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
-        </div>
-        <div>
-          <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
         </div>
         <canvas style={{ border: '1px solid lightgrey' }} id="motion-diff-canvas" ref={this._initMotionDiffCanvas}>
         </canvas>
@@ -66,11 +67,14 @@ class Component extends React.Component {
           { /* TODO REMOVE THIS */}
           <img id="photo" style={{ display: 'none' }} src={this.state.photoSrc} alt="The screen capture will appear in this box." />
         </div>
+        <div>
+          <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
+        </div>
         <p>
           {this.state.textToSpeak ? this.state.textToSpeak : ''}
         </p>
         <p>
-          Detection score: {this.state.motionScore} ({this.state.detectionState})
+          Detection score: {this.state.motionScore}
         </p>
         <p>
           {this.state.error ? 'Error happened: ' + this.state.error : ''}
@@ -117,14 +121,15 @@ class Component extends React.Component {
 
     switch (state) {
       case STATE_PRESENT: {
-        this.speak('Well hello there, handsome!');
+
+        // this.speak('Hello');
         this.faceIdentityProvider.start();
         break;
       }
 
       case STATE_NOT_PRESENT: {
         console.info('Presence ended.')
-        this.speak('See you later!');
+        // this.speak('Bye');
         this.faceIdentityProvider.stop();
         break;
       }
@@ -175,13 +180,22 @@ class Component extends React.Component {
 
   onFacesDetected(faces) {
     console.info(`IdentifyOnPresence: Detected ${faces.length} faces.`, faces);
+    const detectionState = `${STATE_FACE_DETECTED}: ${faces.map(face => face.faceId).join(' ')}`;
+    this.setState({detectionState})
   }
 
   onPersonsIdentified(persons) {
     console.info(`IdentifyOnPresence: Identified ${persons.length} persons.`, persons);
     const person = persons[0];
-    this.speak(`Hi ${person.name}!`);
+    const firstName = person.name.split(' ')[0];
+    const detectionState = `${STATE_PERSON_IDENTIFIED}: ${persons.map(person => person.name).join(', ')}`;
+    this.setState({detectionState})
+
+    this.speak(`Hi ${firstName}!`);
     this.setState({ persons });
+
+    // We got our person, now let's wait until he leaves before we start detecting again
+    this.faceIdentityProvider.stop();
   }
 
   clearphoto() {

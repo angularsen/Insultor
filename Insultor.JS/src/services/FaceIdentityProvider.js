@@ -54,6 +54,7 @@ class FaceIdentityProvider {
    * Stop analyzing face identities.
    * */
   stop() {
+    console.info(`FaceIdentityProvider: Stop analyzing faces.`);
     this.isRunning = false;
   }
 
