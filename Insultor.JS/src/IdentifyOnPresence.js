@@ -59,13 +59,11 @@ class Component extends React.Component {
         <div className="camera">
           <video style={{ border: '1px solid lightgrey' }} id="video" ref={this._initVideo} width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
         </div>
-        <canvas style={{ border: '1px solid lightgrey' }} id="motion-diff-canvas" ref={this._initMotionDiffCanvas}>
-        </canvas>
-        <canvas style={{ border: '1px solid lightgrey' }} id="faceapi-canvas" ref={this._initFaceApiCanvas} width={width} height={height}>
-        </canvas>
-        <div className="output">
-          { /* TODO REMOVE THIS */}
-          <img id="photo" style={{ display: 'none' }} src={this.state.photoSrc} alt="The screen capture will appear in this box." />
+        <div>
+          <canvas style={{ border: '1px solid lightgrey' }} id="motion-diff-canvas" ref={this._initMotionDiffCanvas}></canvas>
+        </div>
+        <div>
+          <canvas style={{ border: '1px solid lightgrey' }} id="faceapi-canvas" ref={this._initFaceApiCanvas} width={width} height={height}></canvas>
         </div>
         <div>
           <button style={buttonStyle} onClick={ev => this.startStopOnClick(ev)}>{startStopButtonText}</button>
@@ -163,7 +161,6 @@ class Component extends React.Component {
   _initMotionDiffCanvas(motionDiffCanvas) {
     this.motionDiffCanvas = motionDiffCanvas;
     if (!motionDiffCanvas) return;
-    this.clearphoto();
 
     this._initDiffCam();
   }
@@ -196,18 +193,6 @@ class Component extends React.Component {
 
     // We got our person, now let's wait until he leaves before we start detecting again
     this.faceIdentityProvider.stop();
-  }
-
-  clearphoto() {
-    console.log('IdentifyOnPresence: IdentifyOnPresence: Clear photo');
-
-    const motionDiffCanvas = this.motionDiffCanvas;
-    const context = motionDiffCanvas.getContext('2d');
-    context.fillStyle = "#AAA";
-    context.fillRect(0, 0, motionDiffCanvas.width, motionDiffCanvas.height);
-
-    const data = motionDiffCanvas.toDataURL('image/png');
-    this.setState({ photoSrc: data });
   }
 
   speak(msg, opts) {
