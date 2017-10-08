@@ -188,7 +188,27 @@ class Component extends React.Component {
     const detectionState = `${STATE_PERSON_IDENTIFIED}: ${persons.map(person => person.name).join(', ')}`;
     this.setState({detectionState})
 
-    this.speak(`Hi ${firstName}!`);
+    switch (firstName) {
+      case 'Wenche':{
+        this.speak(`Hello ${firstName}, you look lovely today!`);
+        break;
+      }
+      case 'Maria':{
+        this.speak(`Hello ${firstName}, good morning to you! How is the new job working for you?`);
+        break;
+      }
+      case 'Svein':{
+        this.speak(`Hello ${firstName}, the king of the cabin is awake and well! Have a great day!`);
+        break;
+      }
+      case 'Marthe':{
+        this.speak(`Hello my darling Marthe, you look beautiful today!`);
+        break;
+      }
+      default: {
+        this.speak(`Hi ${firstName}!`);
+      }
+    }
     this.setState({ persons });
 
     // We got our person, now let's wait until he leaves before we start detecting again
