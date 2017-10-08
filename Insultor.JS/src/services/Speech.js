@@ -1,7 +1,8 @@
-// Normal-paced speech
+// Normal-paced Norwegian speech
 const defaultOpts = {
 	// voiceURI: 'Microsoft David Desktop - English (United States)',
-	rate: 1.6
+	lang: 'nb-NO',
+	rate: 2,
 	// pitch: 0.15
 };
 
@@ -11,14 +12,12 @@ class Speech {
 		if (!canSpeak) {
 			alert('Text to speech not available on this device.');
 		}
-		const localVoices = window.speechSynthesis.getVoices().filter(v => v.localService);
-		this.voice = localVoices.find(v => v.voiceURI === defaultVoiceURI) || localVoices[0] || undefined; // Fall back to default
 	}
 
 	speak(text, opts) {
 
 		return new Promise((resolve, reject) => {
-			var utter = new SpeechSynthesisUtterance();
+			const utter = new SpeechSynthesisUtterance();
 
 			// Note: some voices don't support altering params
 			Object.assign(utter, defaultOpts, opts, { text });
