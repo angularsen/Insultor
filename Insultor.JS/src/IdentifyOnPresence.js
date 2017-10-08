@@ -41,6 +41,12 @@ class Component extends React.Component {
   }
 
   componentDidMount() {
+    console.log('Mounted IdentifyOnPresence.');
+  }
+
+  componentWillUnmount() {
+    console.log('Unmounting IdentifyOnPresence.');
+    this.stopVideo();
   }
 
   render() {
@@ -141,11 +147,13 @@ class Component extends React.Component {
 
   startVideo(video) {
     // console.log('IdentifyOnPresence: Starting video...');
+    _initVideo(this.video);
   }
 
   stopVideo(video) {
     // console.log('IdentifyOnPresence: Stopping video...');
     // console.log('IdentifyOnPresence: Stopping video...OK.');
+    DiffCamEngine.stop();
   }
 
   startStopOnClick(ev) {
@@ -166,6 +174,8 @@ class Component extends React.Component {
   }
 
   _initFaceApiCanvas(faceApiCanvas) {
+    if (!faceApiCanvas) return;
+
     this.faceIdentityProvider = new FaceIdentityProvider(
       faceApiCanvas,
       new FaceApi(),

@@ -35,6 +35,12 @@ class Component extends React.Component {
   }
 
   componentDidMount() {
+    console.log('Mounted DiffCam.');
+  }
+
+  componentWillUnmount() {
+    console.log('Unmounting DiffCam.');
+    this.stopVideo();
   }
 
   render() {
@@ -171,6 +177,7 @@ class Component extends React.Component {
     //     console.error("Starting video...FAILED!", err);
     //     alert('Could not access video.\n\nSee console for details.');
     //   });
+    this._initVideo(this.video);
   }
 
   stopVideo(video) {
@@ -179,6 +186,7 @@ class Component extends React.Component {
     // video.pause();
     // video.src = "";
     // this.setState({ isPlaying: false })
+    DiffCamEngine.stop();
     console.log('Stopping video...OK.');
   }
 

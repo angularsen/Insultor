@@ -119,6 +119,14 @@ var DiffCamEngine = (function() {
 	function stop() {
 		clearInterval(captureInterval);
 		video.src = '';
+		if (stream) {
+			const tracks = stream.getVideoTracks().concat(stream.getAudioTracks());
+			console.log(`Stopping ${tracks.length} video/audio tracks.`)
+
+			for (const track of tracks){
+				track.stop();
+			}
+		}
 		motionContext.clearRect(0, 0, diffWidth, diffHeight);
 		isReadyToDiff = false;
 	}
