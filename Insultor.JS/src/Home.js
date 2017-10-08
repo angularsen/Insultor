@@ -62,6 +62,8 @@ class Component extends React.Component {
           <button style={buttonStyle} onClick={ev => this.speakRandomJoke(ev)}>Insult me now!</button>
           <button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning(ev)}>Wifey appears in the morning</button>
           <button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning(ev)}>The big chief appears in the morning</button>
+          <button style={buttonStyle} onClick={ev => this.speakNorwegian(ev)}>Si noe norsk</button>
+          <button style={buttonStyle} onClick={ev => this.speakEnglish(ev)}>Say something English</button>
         </div>
         <canvas style={{ border: '1px solid lightgrey' }} id="canvas" ref={this.initCanvas} width={width} height={height}>
         </canvas>
@@ -278,7 +280,7 @@ class Component extends React.Component {
 
   speak(msg, opts) {
     this.setState({ textToSpeak: msg, speakOpts: opts });
-    speech.speak(msg);
+    speech.speak(msg, opts);
   }
 
   didWifeyAppearAndItIsMorning(buttonClickEvent) {
@@ -291,6 +293,14 @@ class Component extends React.Component {
     console.info('The big chief appeared and it is morning.')
     const text = new JokeProvider().randomWifeyMorningCompliment();
     this.speak(text, { theme: 'heroic' })
+  }
+
+  speakNorwegian(buttonClickEvent) {
+    this.speak('En setning på norsk!', {lang: 'nb-NO', rate: 2});
+  }
+
+  speakEnglish(buttonClickEvent) {
+    this.speak('A sentence in English!', {lang: 'en-US', rate: 2});
   }
 
 }
