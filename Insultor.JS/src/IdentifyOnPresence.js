@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import moment from 'moment-mini';
 
 import Speech from './services/Speech';
 import FaceApi from './services/MsFaceApi';
@@ -14,6 +15,14 @@ const STATE_PERSON_IDENTIFIED = 'person identified';
 const PERSONGROUPID_WEBSTEPTRD = 'insultor-webstep-trd';
 
 const speech = new Speech();
+
+const getTimePeriodOfDay = () => {
+  const now = moment();
+  if (now.hour() < 5) return 'night';
+  if (now.hour() < 12) return 'morning';
+  if (now.hour() < 18) return 'evening';
+  return 'late evening';
+};
 
 class Component extends React.Component {
   constructor() {
@@ -198,26 +207,62 @@ class Component extends React.Component {
     const detectionState = `${STATE_PERSON_IDENTIFIED}: ${persons.map(person => person.name).join(', ')}`;
     this.setState({detectionState})
 
+    const period = getTimePeriodOfDay();
     switch (firstName) {
-      case 'Wenche':{
-        this.speak(`Hello ${firstName}, you look lovely today!`);
-        break;
-      }
-      case 'Maria':{
-        this.speak(`Hello ${firstName}, good morning to you! How is the new job working for you?`);
-        break;
-      }
-      case 'Svein':{
-        this.speak(`Hello ${firstName}, the king of the cabin is awake and well! Have a great day!`);
+      case 'Andreas': {
+        switch (period) {
+          case 'morning':
+            this.speak(`God morgen sjef! På tide å ta over verden!`);
+            break;
+          case 'evening':
+            this.speak(`Hei igjen sjef, jeg håper du har hatt en flott dag i dag!`);
+            break;
+          case 'late evening':
+            this.speak(`Det begynner å bli seint sjef, på tide å legge seg!`);
+            break;
+          case 'night':
+            this.speak(`Oi.. Hva gjør du oppe nå, sjef?`);
+            break;
+          default:
+            console.error('Unknown time period', period);
+        }
         break;
       }
       case 'Marthe':{
-        this.speak(`Hello my darling Marthe, you look beautiful today!`);
+        switch (period) {
+          case 'morning':
+            this.speak(`God morgen kjære! Ha en fantastisk dag i dag!`);
+            break;
+          case 'evening':
+            this.speak(`Hei pus, hvordan går det? Jeg håper du har hatt en flott dag i dag!`);
+            break;
+          case 'late evening':
+            this.speak(`Nå er det på tide å bysse lalle, ta med deg sjefen og finn senga så du er klar for morgendagen!`);
+            break;
+          case 'night':
+            this.speak(`Oi.. Hva gjør du oppe midt på natta? Du må se å komme deg i seng pus.`);
+            break;
+          default:
+            console.error('Unknown time period', period);
+        }
+        break;
+      }
+      case 'Wenche':{
+        this.speak(`Hei ${firstName}, du ser flott i dag mor!`);
+        break;
+      }
+      case 'Maria':{
+        this.speak(`Hei ${firstName}, så fint å ha deg på besøk!`);
+        break;
+      }
+      case 'Svein':{
+        this.speak(`Hei ${firstName}, høvdingen selv er på besøk!`);
         break;
       }
       default: {
-        this.speak(`Hi ${firstName}!`);
+        this.speak(`Hei ${firstName}!`);
       }
+
     }
     this.setState({ persons });
 

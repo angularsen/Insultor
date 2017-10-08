@@ -50,6 +50,7 @@ class Component extends React.Component {
     const startStopButtonText = this.state.isPlaying ? 'Stop' : 'Start';
     const buttonStyle = { padding: '1em', minWidth: '6em' };
 
+
     return (
       <div>
         <h1>Insult my Face!</h1>
