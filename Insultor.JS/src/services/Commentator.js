@@ -7,6 +7,7 @@ const IDENTIFY_PERSON_TIMEOUT_MS = 10000; // 10 s
 class Commentator {
 
 	constructor() {
+		this.faceIdToStateMap = new Map();
 	}
 
   onFacesDetected(faces) {
@@ -18,15 +19,56 @@ class Commentator {
 
 		// TODO Support multiple faces
 		const face = faces[0];
-		const handler = setTimeout(() => {
+		const { faceId } = face;
+
+		const identifyFaceTimeoutHandle = setTimeout(() => {
+			const faceState = this.faceIdToStateMap.get(faceId);
+			if (!faceState) {
+				console.error('No stored state for face: ' + faceId);
+				return;
+			}
+
+			console.info('Timed out waiting for identification of face: ' + faceId);
+			this.faceIdToStateMap.set(faceId, {
+				...faceState,
+				state: 'face without identity'
+			});
 
 		}, IDENTIFY_PERSON_TIMEOUT_MS);
-		this.
+
+		this.faceIdToStateMap.set(faceId, {
+			state: 'detected face',
+			detectedOn: new Date(),
+			face,
+			identifyFaceTimeoutHandle
+		});
+
   }
 
-  onPersonsIdentified(persons) {
-    console.info(`Commentator: Identified ${persons.length} persons.`, persons);
-    const person = persons[0];
+	/**
+	 * 
+	 * @param {*} faceIds Array of face IDs, each used to identify the person of the same index in the persons param.
+	 * @param {*} persons Array of persons. See person_res.json for person object.
+	 */
+  onPersonsIdentified(faceIds, persons) {
+		console.info(`Commentator: Identified ${persons.length} persons.`, persons);
+
+		// TODO Handle multiple persons
+		const faceId = faceIds[0];
+		const person = persons[0];
+		
+		const faceState = this.faceIdToStateMap.get(faceId);
+		if (!faceState) {
+			console.error('No stored state for face: ' + faceId);
+			return;
+		}
+
+		if (faceState.identifyFaceTimeoutHandle !== undefined) {
+				console.debug('Cancel identify face timeout for face: ' + faceId);
+				clearTimeout(identifyFaceTimeoutHandle);
+				faceState.identifyFaceTimeoutHandle = undefined;
+		}
+
     const firstName = person.name.split(' ')[0];
     const detectionState = `${STATE_PERSON_IDENTIFIED}: ${persons.map(person => person.name).join(', ')}`;
     this.setState({detectionState})
