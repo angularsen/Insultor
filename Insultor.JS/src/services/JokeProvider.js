@@ -6,6 +6,15 @@ function getRandom(items) {
 
 class JokeProvider {
 
+  /**
+   * 
+   * @param {*} faceDetectResult The face detection result (face_detect_res.json)
+   * @param {*} optionalIdentifiedPerson Optional, the identified person (person_res.json)
+   */
+  getCommentForPerson(faceDetectResult, optionalIdentifiedPerson) {
+    
+  }
+
   getJoke(faceAnalysis) {
     if (faceAnalysis === undefined) return 'No joke for you!';
 
