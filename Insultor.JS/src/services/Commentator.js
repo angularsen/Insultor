@@ -1,8 +1,18 @@
 /**
  * Time from face detection until we stop waiting for face identification,
- * to deliver a generic comment on facial attributes instead of the persona.
+ * to deliver a generic comment on facial attributes instead of on the persona.
  */
-const IDENTIFY_PERSON_TIMEOUT_MS = 10000; // 10 s
+const IDENTIFY_PERSON_TIMEOUT_MS = 10000; // 10 seconds
+
+/**
+ * Minimum time between comments on an identified person.
+ */
+const COMMENT_COOLDOWN_PER_PERSON_MS = 30000; // 30 seconds - TODO Increase this to like 5 minutes when not actively developing and testing
+
+/**
+ * Minimum time between generic comments on an anonymous face (identification timed out).
+ */
+const COMMENT_COOLDOWN_ON_ANY_FACE_MS = 10000; // 10 seconds - TODO Increase this to like 1 minute when not actively developing and testing
 
 class Commentator {
 
@@ -10,16 +20,23 @@ class Commentator {
 		this.faceIdToStateMap = new Map();
 	}
 
-  onFacesDetected(faces) {
-		if (!faces || faces.length == 0) {
+  onFacesDetected(detectedFaces) {
+		if (!detectedFaces || detectedFaces.length == 0) {
 			console.error('No faces received.');
 			return;
 		}
-		console.info(`Commentator: Detected ${faces.length} faces.`, faces);
+		console.info(`Commentator: Detected ${detectedFaces.length} faces.`, detectedFaces);
+
 
 		// TODO Support multiple faces
-		const face = faces[0];
-		const { faceId } = face;
+		const detectedFace = detectedFaces[0];
+		const { faceId } = detectedFace;
+		const faceState = this.faceIdToStateMap.get(faceId);
+
+		if (faceState.identifyFaceTimeoutHandle !== undefined) {
+			console.debug('Skipping face, already in the pridentifying')
+			return;
+		}
 
 		const identifyFaceTimeoutHandle = setTimeout(() => {
 			const faceState = this.faceIdToStateMap.get(faceId);
@@ -29,17 +46,19 @@ class Commentator {
 			}
 
 			console.info('Timed out waiting for identification of face: ' + faceId);
-			this.faceIdToStateMap.set(faceId, {
+			const newFaceState = {
 				...faceState,
 				state: 'face without identity'
-			});
+			};
+			this.faceIdToStateMap.set(faceId, newFaceState);
 
+			this.commentOnFaceWithoutIdentity(detectedFace);
 		}, IDENTIFY_PERSON_TIMEOUT_MS);
 
 		this.faceIdToStateMap.set(faceId, {
 			state: 'detected face',
 			detectedOn: new Date(),
-			face,
+			detectedFace,
 			identifyFaceTimeoutHandle
 		});
 
@@ -59,21 +78,35 @@ class Commentator {
 		
 		const faceState = this.faceIdToStateMap.get(faceId);
 		if (!faceState) {
-			console.error('No stored state for face: ' + faceId);
+			console.error('No state for identified face: ' + faceId);
 			return;
 		}
 
 		if (faceState.identifyFaceTimeoutHandle !== undefined) {
 				console.debug('Cancel identify face timeout for face: ' + faceId);
 				clearTimeout(identifyFaceTimeoutHandle);
-				faceState.identifyFaceTimeoutHandle = undefined;
+				faceState = { ...faceState, identifyFaceTimeoutHandle: undefined };
+				this.faceIdToStateMap.set(faceId, faceState);
 		}
 
-    const firstName = person.name.split(' ')[0];
-    const detectionState = `${STATE_PERSON_IDENTIFIED}: ${persons.map(person => person.name).join(', ')}`;
-    this.setState({detectionState})
+		faceState = { ...faceState, state: 'identified face' };
+		this.faceIdToStateMap.set(faceId, faceState);
+
+		if (faceState.lastCommented === undefined || (new Date() - faceState.lastCommented) > COMMENT_COOLDOWN_PER_PERSON_MS)
+		this.commentOnFaceWithIdentity(faceState.detectedFace, person);
+	}
+	
+	commentOnFaceWithoutIdentity(detectedFace) {
+		console.info('Comment on face without identity.');
+	}
+
+	commentOnFaceWithIdentity(detectedFace, person) {
+		console.info('Comment on face with identity.');
 
     const period = getTimePeriodOfDay();
+		const firstName = person.name.split(' ')[0];
+
+
     switch (firstName) {
       case 'Andreas': {
         switch (period) {
@@ -130,12 +163,7 @@ class Commentator {
       }
 
     }
-    this.setState({ persons });
-
-    // We got our person, now let's wait until he leaves before we start detecting again
-    this.faceIdentityProvider.stop();
-  }
-
+	}
 
 }
 
