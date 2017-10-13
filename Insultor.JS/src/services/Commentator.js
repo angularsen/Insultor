@@ -14,10 +14,44 @@ const COMMENT_COOLDOWN_PER_PERSON_MS = 30000; // 30 seconds - TODO Increase this
  */
 const COMMENT_COOLDOWN_ON_ANY_FACE_MS = 10000; // 10 seconds - TODO Increase this to like 1 minute when not actively developing and testing
 
+class CommentatorStateMachine {
+	constructor(initialStateName) {
+		this.actions = {
+			facesDetected: { name: 'FACES_DETECTED', invoke: this.onFacesDetected},
+		};
+		this.states = {
+			notDetected: { name: 'NOT_DETECTED', actions: [this.actions.facesDetected] },
+			facesDetected: 'FACES_DETECTED',
+		};
+		const stateNames = Object.values(this.states).map(x => x.name);
+		if (!stateNames.some(x => x == initialStateName)) {
+			throw new Error(`Initial state name [${initialStateName}] must match one of the defined states [${stateNames.join(', ')}]`);
+		}
+		this.state = initialState;
+	}
+
+	getStates() { return Object.values(this.states); }
+
+	onAction(name, payload) {
+		// const stateObj =  //this.getStates().find(x => x.name == name);
+		// if (!stateObj) throw new Error('State not found: ' + name);
+		const action = this.state.actions.find(x => x.name == name);
+		if (!action) throw new Error('Action not found: ' + name);
+
+		action.invoke(payload);
+	}
+
+	onFacesDetected(payload) {
+		
+	}
+
+}
+
 class Commentator {
 
 	constructor() {
 		this.faceIdToStateMap = new Map();
+		this.fsm = new CommentatorStateMachine();
 	}
 
   onFacesDetected(detectedFaces) {
