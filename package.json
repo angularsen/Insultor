@@ -1,37 +1,41 @@
 {
-  "name": "minimal-react-starter",
+  "name": "insultor",
   "version": "0.1.0",
-  "description": "Minimal react starter project",
+  "description": "Delivers insults to your face, based on your face.",
   "main": "src/index.js",
   "scripts": {
+    "clean": "rimraf www/bundle.js*",
     "compile": "webpack",
-    "build": "webpack -p",
-    "build-dev": "webpack",
+    "prebuild": "npm run clean -s",
+    "build": "webpack --config webpack.prod.js",
+    "build-dev": "webpack --config webpack.dev.js",
     "start": "node server.js",
-    "deploy": "npm run-script build && surge -p www",
-    "deploy-dev": "npm run-script build-dev && surge -p www"
+    "deploy": "npm run build && surge -p www",
+    "deploy-dev": "npm run build-dev && surge -p www"
   },
   "keywords": [
+    "insults",
+    "for",
+    "your",
+    "face",
+    "using",
     "react",
     "webpack",
     "babel",
-    "minimal",
-    "starter"
+    "Microsoft Face API"
   ],
-  "author": "Andrew H Farmer",
+  "author": "Andreas Gullberg Larsen",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git://github.com/ahfarmer/minimal-react-starter.git"
+    "url": "https://bitbucket.org/angularsen/insultor"
   },
   "dependencies": {
     "express": "^4.15.3",
     "moment-mini": "^2.18.1",
     "react": "^16.0.0",
     "react-dom": "^16.0.0",
-    "react-router-dom": "^4.2.2",
-    "webpack": "^3.0.0",
-    "webpack-dev-middleware": "^1.11.0"
+    "react-router-dom": "^4.2.2"
   },
   "devDependencies": {
     "babel-core": "^6.25.0",
@@ -41,6 +45,10 @@
     "babel-preset-env": "^1.6.0",
     "babel-preset-react": "^6.24.1",
     "babel-preset-stage-2": "^6.24.1",
-    "surge": "^0.19.0"
+    "rimraf": "^2.6.2",
+    "surge": "^0.19.0",
+    "uglifyjs-webpack-plugin": "^1.0.0-beta.3",
+    "webpack": "^3.0.0",
+    "webpack-dev-middleware": "^1.11.0"
   }
 }
