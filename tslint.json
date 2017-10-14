@@ -1,0 +1,20 @@
+{
+  "extends": "tslint:latest",
+  "rules": {
+    "indent": {
+        "options": "tabs"
+    },
+    "quotemark": {
+        "options": "single"
+    },
+    "semicolon": {
+        "options": "never"
+    },
+    "variable-name": {
+        "options": "allow-leading-underscore"
+    },
+    "interface-name": {
+        "options": "never-prefix"
+    }
+  }
+}
