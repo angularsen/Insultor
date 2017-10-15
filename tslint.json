@@ -13,8 +13,8 @@
     "variable-name": {
         "options": "allow-leading-underscore"
     },
-    "interface-name": {
-        "options": "never-prefix"
-    }
+    "interface-name": false,
+    "no-console": false,
+    "arrow-parens": false
   }
 }
