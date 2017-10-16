@@ -7,7 +7,7 @@ import FaceApi from './services/MsFaceApi';
 import FaceIdentityProvider from './services/FaceIdentityProvider';
 import PresenceDetector from './services/PresenceDetector';
 import { STATE_PRESENT, STATE_NOT_PRESENT } from './services/PresenceDetector';
-import Commentator from './services/Commentator';
+// import Commentator from './services/Commentator';
 import DiffCamEngine from './services/diff-cam-engine';
 
 const STATE_FACE_DETECTED = 'face detected';

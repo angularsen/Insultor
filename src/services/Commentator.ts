@@ -1,12 +1,8 @@
-import {} from 'jasmine'
-import { DetectFaceResult, DetectFacesResponse } from '../docs/FaceAPI/DetectFacesResponse'
-import { IdentifyFaceResult, IdentifyFacesResponse } from '../docs/FaceAPI/IdentifyFacesResponse'
-import Person from '../docs/FaceAPI/Person'
+import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
+import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
+import Person from '../../docs/FaceAPI/Person'
 
-// tslint:disable:max-classes-per-file
-// tslint:disable:no-var-requires
-
-const timeout = (ms: number) => new Promise((res: () => void) => setTimeout(res, ms))
+function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
 // tslint:disable-next-line:variable-name
 const StateMachine = require('javascript-state-machine')
@@ -32,14 +28,14 @@ const Action = strEnum([
 type Action = keyof typeof Action
 
 // tslint:disable-next-line:variable-name
-const State = strEnum([
+export const State = strEnum([
 	'Idle',
 	'DetectPresence',
 	'DetectFaces',
 	'IdentifyFaces',
 	'DeliverComments',
 ])
-type State = keyof typeof State
+export type State = keyof typeof State
 
 type MyStateMachineEvent = (...args: any[]) => void
 
@@ -215,7 +211,11 @@ interface CommentatorOptions {
 	personGroupId?: AAGUID
 }
 
-class Commentator {
+export class Commentator {
+	set onTransition(callback: (lifecycle: Lifecycle, ...args: any[]) => void) {
+		this._fsm.onTransition = callback;
+	}
+
 	private _fsm: MyStateMachine
 
 	constructor({
@@ -254,7 +254,7 @@ class Commentator {
 			}
 		}
 
-		fsm.onTransition = (lifecycle: Lifecycle, arg1: any, arg2: any) => {
+		fsm.onTransition = (lifecycle: Lifecycle, ...args: any[]) => {
 			console.log(`onTransition: ${lifecycle.transition} from ${lifecycle.from} to ${lifecycle.to}`)
 		}
 
@@ -268,7 +268,7 @@ class Commentator {
 			presenceDetector.start()
 		}
 
-		const detectFacesFromCurrentVideoImageAsync = async () => {
+		const detectFacesFromCurrentVideoImageAsync = async (): Promise<any> => {
 			console.debug('detectFacesFromCurrentVideoImageAsync')
 			const imageDataUrl = videoService.getCurrentImageDataUrl()
 			const detectFacesResult = await faceApi.detectFacesAsync(imageDataUrl)
@@ -277,7 +277,7 @@ class Commentator {
 			}
 		}
 
-		fsm.onDetectFaces = async () => {
+		fsm.onDetectFaces = async (): Promise<any> => {
 			while (fsm.state === 'DetectFaces') {
 				await detectFacesFromCurrentVideoImageAsync()
 				await timeout(4000)
@@ -285,8 +285,11 @@ class Commentator {
 		}
 
 		fsm.onIdentifyFaces = async (
-			lifecycle: Lifecycle, from: State, to: State,
-			detectFacesResult: DetectFacesResponse) => {
+			lifecycle: Lifecycle, 
+			from: State, 
+			to: State,
+			detectFacesResult: DetectFacesResponse): Promise<any> => {
+
 			const faceIds = detectFacesResult.map((x) => x.faceId)
 			const identifyFacesResult = await faceApi.identifyFacesAsync(faceIds, personGroupId)
 			const MIN_CONFIDENCE = 0.5
@@ -329,20 +332,4 @@ class Commentator {
 	// Transition handlers
 }
 
-describe('Commentator', () => {
-	it('Defaults to start in Idle state.', () => {
-			expect(new Commentator({}).state).toBe(State.Idle)
-	})
-
-	it('When in `Idle`, action `Start` transitions to `DetectPresence`', () => {
-		const mockedPresenceDetector = jasmine.createSpyObj('presenceDetector', {start: 0 })
-		const sm = new Commentator({
-			init: 'Idle',
-			presenceDetector: mockedPresenceDetector,
-		})
-		sm.start()
-		expect(sm.state).toBe(State.DetectPresence)
-		expect(mockedPresenceDetector.start).toHaveBeenCalled()
-	})
-
-})
+export default Commentator
