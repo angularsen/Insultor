@@ -1,8 +1,20 @@
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import Person from '../../docs/FaceAPI/Person'
+import Cache from './Cache'
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
+
+function contains(arr: any[], predicate: (item: any, idx: number) => boolean) {
+		return arr.findIndex(predicate) >= 0
+}
+
+function last(arr: any[]) {
+	const [lastItem] = arr.slice(-1)
+	return lastItem
+}
+
+// tslint:disable:max-classes-per-file
 
 // tslint:disable-next-line:variable-name
 const StateMachine = require('javascript-state-machine')
@@ -29,51 +41,80 @@ type Action = keyof typeof Action
 
 // tslint:disable-next-line:variable-name
 export const State = strEnum([
-	'Idle',
-	'DetectPresence',
-	'DetectFaces',
-	'IdentifyFaces',
-	'DeliverComments',
+	'idle',
+	'detectPresence',
+	'detectFaces',
+	'identifyFaces',
+	'deliverComments',
 ])
 export type State = keyof typeof State
 
-type MyStateMachineEvent = (...args: any[]) => void
+type MyEventCaller = (...args: any[]) => void
 
 interface MyStateMachine {
+	// Transitions
+	deliverComments: (input: DeliverCommentsInput) => void
+	commentsDelivered?: MyEventCaller
+	start?: MyEventCaller
+	stop?: MyEventCaller
+	presenceDetected?: MyEventCaller
+	noPresenceDetected?: MyEventCaller
+	facesDetected?: (input: DetectFacesResponse) => void
+	facesIdentified?: (input: IdentifyFacesResponse) => void
+
+	// Props
 	state: State
-	start?: MyStateMachineEvent
-	stop?: MyStateMachineEvent
-	presenceDetected?: MyStateMachineEvent
-	noPresenceDetected?: MyStateMachineEvent
-	facesDetected?: (detectFacesResult: DetectFacesResponse) => void
-	facesIdentified?: (identifyFacesResult: IdentifyFacesResponse) => void
-	commentsDelivered?: MyStateMachineEvent
-	onTransition: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onStart: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onStop: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onIdle: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onDetectPresence: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onDetectFaces: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onLeaveDetectFaces: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
-	onIdentifyFaces: (lifecycle: Lifecycle, from: State, to: State, detectFacesResult: DetectFacesResponse) => void
-	onDeliverComments: (lifecycle: Lifecycle, from: State, to: State, ...args: any[]) => void
+	onTransition: (lifecycle: Lifecycle, ...args: any[]) => void
+
+	// Methods
+	observe: {
+		(event: string, callback: (lifecycle: Lifecycle, ...args: any[]) => void): void,
+		(events: object): void,
+	}
+}
+
+interface IdentifyFacesInput {
+	detectFacesResult: DetectFacesResponse
+}
+
+interface IdentifiedPerson {
+	personId: string
+	firstName: string
+	lastName: string
+	confidence: number
+	detectFaceResult: DetectFaceResult
+}
+
+interface DeliverCommentsInput {
+	identifiedPersons: IdentifiedPerson[]
+	unidentifiedFaces: DetectFaceResult[]
 }
 
 interface MyConfig {
 	init?: State | { state: State, event: Action, defer: boolean }
-	transitions?: MyStateMachineEventDef[]
+	transitions?: MyTransition[]
 	callbacks?: {
-		[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any;
+		[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
+	}
+	methods?: {
+		onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
+		onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
 	}
 }
 
-interface MyStateMachineEventDef {
+interface MyTransition {
 	name: Action
 	from: '*' | State | State[]
 	to: State
 }
 
-interface IPresenceDetector {
+export interface IPresenceDetector {
 	onDetectedChanged?: (detected: boolean) => void
 	addMotionScore(motionScore: number, receivedOnDate: Date): void
 	start(): void
@@ -83,24 +124,24 @@ interface IPresenceDetector {
 class FakePresenceDetector implements IPresenceDetector {
 	public onDetectedChanged: (detected: boolean) => void
 	public start(): void {
-		console.log('FakePresenceDetector: Start.')
+		console.log('FakePresenceDetector: Start detecting presence.')
 	}
 	public stop(): void {
-		console.log('FakePresenceDetector: Stop.')
+		console.log('FakePresenceDetector: Stop detecting presence.')
 	}
 	public addMotionScore(motionScore: number, receivedOnDate: Date): void {
 		console.log('FakePresenceDetector: Added motion score ' + motionScore)
 	}
 }
 
-interface ISpeechOpts {
+export interface ISpeechOpts {
 	voiceURI?: string
 	lang?: string
 	rate?: number
 	pitch?: number
 }
 
-interface ISpeech {
+export interface ISpeech {
 	speak(text: string, opts?: ISpeechOpts): void
 }
 
@@ -114,7 +155,7 @@ class FakeSpeech implements ISpeech {
  * Handles configuring video source to stream to a <video> HTML element
  * and has actions for starting/stopping video stream.
  */
-interface IVideoService {
+export interface IVideoService {
 	/**
 	 * Gets an URL encoded string of the current image data.
 	 */
@@ -135,31 +176,32 @@ class FakeVideoService implements IVideoService {
 		return 'Fake image data URL'
 	}
 	public start(): void {
-		console.log('FakeVideoService: start video')
+		console.log('FakeVideoService: Start video.')
 	}
 	public stop(): void {
-		console.log('FakeVideoService: stop video')
+		console.log('FakeVideoService: Stop video.')
 	}
 }
 
-interface IMicrosoftFaceApi {
-	detectFacesAsync(imageDataUrl: string): DetectFacesResponse
-	getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Person
-	identifyFacesAsync(faceIds: AAGUID[], personGroupId: AAGUID): IdentifyFacesResponse
+export interface IMicrosoftFaceApi {
+	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
+	getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person>
+	identifyFacesAsync(faceIds: AAGUID[], personGroupId: AAGUID): Promise<IdentifyFacesResponse>
 }
 
 class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
-	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Person {
-		return {
+	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person> {
+		const result: Person = {
 			name: 'Fake person name',
 			persistedFaceIds: ['face face id'],
 			personId: 'fake person id',
 			userData: 'fake person userdata',
 		}
+		return Promise.resolve(result)
 	}
 
-	public detectFacesAsync(imageDataUrl: string): DetectFacesResponse {
-		return [
+	public detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
+		const result: DetectFacesResponse = [
 			{
 				faceAttributes: {
 					age: 35,
@@ -168,24 +210,24 @@ class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 				faceId: 'fake face id',
 			} as any,
 		]
+		return Promise.resolve(result)
 	}
 
-	public identifyFacesAsync(faceIds: string[], personGroupId: string): IdentifyFacesResponse {
-		return faceIds.map((faceId, i) => {
-			return {
-				candidates: [
-					{
-						confidence: 0.8,
-						personId: 'fake person id for face ' + faceId,
-					},
-				],
-				faceId,
-			}
-		})
+	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
+		const result: IdentifyFacesResponse = faceIds.map((faceId, i) => ({
+			candidates: [
+				{
+					confidence: 0.8,
+					personId: 'fake person id for face ' + faceId,
+				},
+			],
+			faceId,
+		}))
+		return Promise.resolve(result)
 	}
 }
 
-interface ICommentProvider {
+export interface ICommentProvider {
 	getComments(identifyFacesResponse: IdentifyFacesResponse): string[]
 }
 
@@ -195,13 +237,14 @@ class FakeCommentProvider implements ICommentProvider {
 	}
 }
 
-interface Lifecycle {
+export interface Lifecycle {
 	transition: string
 	from: State
 	to: State
 }
 
-interface CommentatorOptions {
+export interface CommentatorOptions {
+	onTransition?: (lifecycle: Lifecycle, ...args: any[]) => void
 	init?: State
 	videoService?: IVideoService
 	presenceDetector?: IPresenceDetector
@@ -211,35 +254,61 @@ interface CommentatorOptions {
 	personGroupId?: AAGUID
 }
 
+function isDefined<T>(myParam: T, msg: string): T {
+	if (myParam === undefined) {
+		throw new Error(`Parameter ${myParam} was undefined.`)
+	}
+	return myParam
+}
+
 export class Commentator {
-	set onTransition(callback: (lifecycle: Lifecycle, ...args: any[]) => void) {
-		this._fsm.onTransition = callback;
+	public set onTransition(value: (lifecycle: Lifecycle, ...args: any[]) => void) {
+		this._fsm.observe('onTransition', value)
 	}
 
+	private _commentProvider: ICommentProvider
+	private _faceApi: IMicrosoftFaceApi
 	private _fsm: MyStateMachine
+	private _personGroupId: AAGUID
+	private _presenceDetector: IPresenceDetector
+	private _speech: ISpeech
+	private _videoService: IVideoService
 
 	constructor({
 		commentProvider = new FakeCommentProvider(),
 		faceApi = new FakeMicrosoftFaceApi(),
-		init = 'Idle',
+		init = 'idle',
 		presenceDetector = new FakePresenceDetector(),
 		speech = new FakeSpeech(),
 		videoService = new FakeVideoService(),
 		personGroupId,
 	}: CommentatorOptions = {}) {
 
+		this._commentProvider = isDefined(commentProvider, 'commentProvider')
+		this._faceApi = isDefined(faceApi, 'faceApi')
+		this._presenceDetector = isDefined(presenceDetector, 'presenceDetector')
+		this._speech = isDefined(speech, 'speech')
+		this._videoService = isDefined(videoService, 'videoService')
+		this._personGroupId = personGroupId
+
+		this._doDeliverComments = this._doDeliverComments.bind(this)
+		this._doDetectFacesAsync = this._doDetectFacesAsync.bind(this)
+		this._doDetectPresence = this._doDetectPresence.bind(this)
+		this._doIdentifyFacesAsync = this._doIdentifyFacesAsync.bind(this)
+		this._doIdle = this._doIdle.bind(this)
+
 		const config: MyConfig = {
 			init,
 			transitions: [
-				{ from: '*', name              : 'stop', to              : 'Idle' },
-				{ from: 'Idle', name           : 'start', to             : 'DetectPresence' },
-				{ from: 'DetectPresence', name : 'presenceDetected', to  : 'DetectFaces' },
-				{ from: 'DetectFaces', name    : 'facesDetected', to     : 'IdentifyFaces' },
-				{ from: 'DetectFaces', name    : 'noPresenceDetected', to: 'DetectPresence' },
-				{ from: 'IdentifyFaces', name  : 'facesIdentified', to   : 'DeliverComments' },
-				{ from: 'IdentifyFaces', name  : 'noPresenceDetected', to: 'DetectPresence' },
-				{ from: 'DeliverComments', name: 'commentsDelivered', to : 'DetectFaces' },
-				{ from: 'DeliverComments', name: 'noPresenceDetected', to: 'DetectPresence' },
+				{ from: '*', name              : 'stop', to              : 'idle' },
+				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
+				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
+				{ from: 'detectFaces', name    : 'facesDetected', to     : 'identifyFaces' },
+				{ from: 'detectFaces', name    : 'noPresenceDetected', to: 'detectPresence' },
+				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
+				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: 'detectPresence' },
+				{ from: 'deliverComments', name: 'commentsDelivered', to : 'detectFaces' },
+				{ from: 'deliverComments', name: 'noPresenceDetected', to: 'detectPresence' },
 			],
 		}
 
@@ -254,19 +323,26 @@ export class Commentator {
 			}
 		}
 
-		fsm.onTransition = (lifecycle: Lifecycle, ...args: any[]) => {
-			console.log(`onTransition: ${lifecycle.transition} from ${lifecycle.from} to ${lifecycle.to}`)
-		}
+		fsm.observe({
+			// States
+			onDeliverComments: this._doDeliverComments,
+			onDetectFaces: this._doDetectFacesAsync,
+			onDetectPresence: this._doDetectPresence,
+			onIdentifyFaces: this._doIdentifyFacesAsync,
+			onIdle: this._doIdle,
+			// onEnterdetectPresence: () => console.log('!onDetectPresence!!'), // (lifecycle: Lifecycle) => this._doDetectPresence(lifecycle),
+			// onEnterState: (lifecycle: Lifecycle) => { console.log('OnEnterState: ' + lifecycle.transition)},
+			// onAfterTransition: () => console.log('AFTER TRANSITION'),
+			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
+				console.log(`onTransition: ${lifecycle.transition} from ${lifecycle.from} to ${lifecycle.to}`)
+			},
+		})
 
-		fsm.onIdle = () => {
-			presenceDetector.stop()
-			videoService.stop()
-		}
-
-		fsm.onDetectPresence = () => {
-			videoService.start()
-			presenceDetector.start()
-		}
+		// fsm.observe('onIdle', this._doIdle)
+		// fsm.observe('onDetectPresence', this._doDetectPresence)
+		// fsm.observe('onDetectFaces', this._doDetectFacesAsync)
+		// fsm.observe('onIdentifyFaces', this._doIdentifyFacesAsync)
+		// fsm.observe('onDeliverComments', this._doDeliverComments)
 
 		const detectFacesFromCurrentVideoImageAsync = async (): Promise<any> => {
 			console.debug('detectFacesFromCurrentVideoImageAsync')
@@ -277,45 +353,15 @@ export class Commentator {
 			}
 		}
 
-		fsm.onDetectFaces = async (): Promise<any> => {
-			while (fsm.state === 'DetectFaces') {
+		fsm.observe('onDetectFaces', async (): Promise<any> => {
+			console.log('onDetectFaces')
+
+			while (fsm.state === 'detectFaces') {
 				await detectFacesFromCurrentVideoImageAsync()
 				await timeout(4000)
 			}
-		}
+		})
 
-		fsm.onIdentifyFaces = async (
-			lifecycle: Lifecycle, 
-			from: State, 
-			to: State,
-			detectFacesResult: DetectFacesResponse): Promise<any> => {
-
-			const faceIds = detectFacesResult.map((x) => x.faceId)
-			const identifyFacesResult = await faceApi.identifyFacesAsync(faceIds, personGroupId)
-			const MIN_CONFIDENCE = 0.5
-
-			const identifiedPersons = await Promise.all(identifyFacesResult
-				.filter(face => face.candidates.filter(x => x.confidence >= MIN_CONFIDENCE).length > 0)
-				.map(face => faceApi.getPersonAsync(personGroupId, face.candidates[0].personId)))
-
-			const unrecognizedFaces = identifyFacesResult
-				.filter(face => face.candidates.filter(x => x.confidence >= MIN_CONFIDENCE).length === 0)
-
-			if (identifiedPersons.length) {
-				console.log(`Identified ${identifiedPersons.length} persons.`)
-				console.warn('TODO Add unrecognized face to person group. Skipping for now...')
-			}
-		}
-
-		fsm.onDeliverComments = (
-			lifecycle: Lifecycle, from: State, to: State,
-			identifyFacesResult: IdentifyFacesResponse) => {
-
-			const comments = identifyFacesResult.map((x, i) => 'TODO comment #' + i)
-			for (const comment of comments) {
-				speech.speak(comment)
-			}
-		}
 	}
 
 	get state(): State { return this._fsm.state }
@@ -329,7 +375,96 @@ export class Commentator {
 	public facesIdentified(identifyFacesResult: IdentifyFacesResponse) { this._fsm.facesIdentified(identifyFacesResult) }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
 
-	// Transition handlers
+	// State handlers
+	private _doDeliverComments(lifecycle: Lifecycle, input: DeliverCommentsInput) {
+			console.log('onDeliverComments')
+
+			// TODO Insert contextual comments here
+			const faceComments = input.unidentifiedFaces.map((x, i) => 'Face comment ' + i)
+			const personComments = input.identifiedPersons.map((x, i) => 'Person comment ' + i)
+			const comments = personComments.concat(faceComments)
+
+			for (const comment of comments) {
+				this._speech.speak(comment)
+			}
+		}
+
+	private async _doDetectFacesAsync(lifecycle: Lifecycle) {
+		console.log('doDetectFaces')
+		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
+		try {
+			const result = await this._faceApi.detectFacesAsync(imageDataUrl)
+			if (result && result.length > 0) {
+				console.info(`Detected ${result.length} faces.`)
+				this._fsm.facesDetected(result)
+			} else {
+				console.debug('Did not detect any faces.')
+			}
+		} catch (err) {
+			console.error('Failed to detect faces.', err)
+		}
+	}
+
+	private async _doIdentifyFacesAsync(lifecycle: Lifecycle, input: IdentifyFacesInput) {
+		console.log('doIdentifyFacesAsync')
+		// const imageDataUrl = this._videoService.getCurrentImageDataUrl()
+		try {
+			const detectedFaces = input.detectFacesResult
+			if (!detectedFaces || detectedFaces.length === 0) { throw new Error('No detected faces were given.') }
+
+			const faceIds = detectedFaces.map(x => x.faceId)
+
+			console.debug(`Identifying ${detectedFaces.length} faces...`)
+			const result = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
+
+			const MIN_CONFIDENCE = 0.5
+			const identifiedFaces = result.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
+			const unidentifiedFaces = detectedFaces.filter(detectedFace => identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
+
+			console.info(`Identified ${identifiedFaces.length}/${result.length} faces.`)
+
+			console.debug(`Get person info ${detectedFaces.length} faces...`)
+			const groupId = this._personGroupId
+			const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
+				const personId = identifiedFace.candidates[0].personId
+				const cacheKey = `MS_FACEAPI_GET_PERSON:group[${groupId}]:person[${personId}]`
+				const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(groupId, personId))
+
+				return {
+					identifiedFace,
+					person,
+				}
+			}))
+
+			const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map(x => ({
+				confidence: x.identifiedFace.candidates[0].confidence,
+				detectFaceResult: detectedFaces.find(df => df.faceId === x.identifiedFace.faceId),
+				firstName: x.person.name.split(' ')[0],
+				lastName: last(x.person.name.split(' ')),
+				personId: x.person.personId,
+			}))
+
+			this._fsm.deliverComments({
+				identifiedPersons,
+				unidentifiedFaces,
+			})
+		} catch (err) {
+			console.error('Failed to detect faces.', err)
+		}
+	}
+
+	private _doDetectPresence(lifecycle: Lifecycle) {
+		console.log('doDetectPresence')
+		this._videoService.start()
+		this._presenceDetector.start()
+	}
+
+	private _doIdle(lifecycle: Lifecycle) {
+		console.log('doIdle')
+		this._presenceDetector.stop()
+		this._videoService.stop()
+	}
+
 }
 
 export default Commentator

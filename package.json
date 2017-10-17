@@ -41,7 +41,6 @@
   },
   "devDependencies": {
     "@types/jasmine": "^2.6.0",
-    "@types/javascript-state-machine": "^2.4.1",
     "@types/node": "^8.0.34",
     "awesome-typescript-loader": "^3.2.3",
     "babel-core": "^6.25.0",

@@ -8,6 +8,17 @@ module.exports = function(config) {
 					'**/*.ts': ['karma-typescript'], // *.tsx for React Jsx
 			},
 			karmaTypescriptConfig: {
+				compilerOptions: {
+          target: "es5", // test coverage does not support es2015+
+					sourceMap: true,
+					lib: [
+						"dom",
+						"es2017"
+					]
+				},
+				coverageOptions: {
+						exclude: [/\.(d|spec)\.ts$/i, /.*node_modules.*/]
+				},
 				tsconfig: "./tsconfig.json",
 			},
 			reporters: ['progress', 'karma-typescript'],

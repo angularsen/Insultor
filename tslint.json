@@ -13,6 +13,8 @@
     "variable-name": {
         "options": "allow-leading-underscore"
     },
+    "max-line-length": 140,
+    "no-var-requires": false,
     "interface-name": false,
     "no-console": false,
     "arrow-parens": false
