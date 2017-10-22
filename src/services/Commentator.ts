@@ -15,7 +15,6 @@ function last(arr: any[]) {
 }
 
 // tslint:disable:max-classes-per-file
-
 // tslint:disable-next-line:variable-name
 const StateMachine = require('javascript-state-machine')
 
@@ -108,10 +107,74 @@ interface MyConfig {
 	}
 }
 
+/** Models an event with a generic sender and generic arguments */
+interface IEvent<TArgs> {
+	subscribe(fn: (args: TArgs) => void): void
+	unsubscribe(fn: (args: TArgs) => void): void
+}
+
+class EventDispatcher<TArgs> implements IEvent<TArgs> {
+
+	private _subscriptions: Array<(args: TArgs) => void> = new Array<(args: TArgs) => void>()
+
+	public subscribe(fn: (args: TArgs) => void): void {
+		if (fn) {
+			this._subscriptions.push(fn)
+		}
+	}
+
+	public unsubscribe(fn: (args: TArgs) => void): void {
+		const i = this._subscriptions.indexOf(fn)
+		if (i > -1) {
+			this._subscriptions.splice(i, 1)
+		}
+	}
+
+	public dispatch(args: TArgs): void {
+		for (const handler of this._subscriptions) {
+			handler(args)
+		}
+	}
+}
+
+class EventList<TArgs> {
+
+	private _events: { [name: string]: EventDispatcher<TArgs> } = {}
+
+	public get(name: string): EventDispatcher<TArgs> {
+
+		let event = this._events[name]
+
+		if (event) {
+			return event
+		}
+
+		event = new EventDispatcher<TArgs>()
+		this._events[name] = event
+		return event
+	}
+
+	public remove(name: string): void {
+		this._events[name] = null
+	}
+}
+
 interface MyTransition {
 	name: Action
 	from: '*' | State | State[]
 	to: State
+}
+
+export interface IPeriodicFaceDetector {
+	readonly faceDetected: IEvent<DetectFaceResult[]>
+	/**
+	 * Start periodic face detection.
+	 * @param minIntervalMs Minimum interval between each face detection request,
+	 * but will not run until the previous request has completed to avoid concurrently queueing up requests.
+	 * @param getCurrentImageDataUrl Callback method to provide the data URL encoded image for the current video image.
+	 */
+	start(minIntervalMs: number, getCurrentImageDataUrl: () => string): void
+	stop(): void
 }
 
 export interface IPresenceDetector {
@@ -119,6 +182,28 @@ export interface IPresenceDetector {
 	addMotionScore(motionScore: number, receivedOnDate: Date): void
 	start(): void
 	stop(): void
+}
+
+class FakePeriodicFaceDetector implements IPeriodicFaceDetector {
+	private _faceDetected = new EventDispatcher<DetectFaceResult[]>()
+	private _intervalHandle: NodeJS.Timer
+
+	public get faceDetected(): IEvent<DetectFaceResult[]> { return this._faceDetected }
+
+	constructor(private _getFakeResult: () => DetectFaceResult[]) {
+	}
+
+	public start(intervalMs: number): void {
+		console.info(`FakePeriodicFaceDetector: Start detecting every ${intervalMs} ms.`)
+		this._intervalHandle = setInterval(() => {
+			this._faceDetected.dispatch(this._getFakeResult())
+		}, intervalMs)
+	}
+
+	public stop(): void {
+		console.info(`FakePeriodicFaceDetector: Stopping.`)
+		clearInterval(this._intervalHandle)
+	}
 }
 
 class FakePresenceDetector implements IPresenceDetector {
@@ -247,6 +332,8 @@ export interface CommentatorOptions {
 	onTransition?: (lifecycle: Lifecycle, ...args: any[]) => void
 	init?: State
 	videoService?: IVideoService
+	periodicFaceDetector?: IPeriodicFaceDetector
+	periodicFaceDetectorIntervalMs?: number
 	presenceDetector?: IPresenceDetector
 	speech?: ISpeech
 	faceApi?: IMicrosoftFaceApi
@@ -261,11 +348,20 @@ function isDefined<T>(myParam: T, msg: string): T {
 	return myParam
 }
 
+// To avoid filling out entire object for the sake of a test
+// tslint:disable-next-line:no-object-literal-type-assertion
+const fakeFace = {
+	faceAttributes: { gender: 'male', age: 40 },
+	faceId: 'fake face id',
+} as DetectFaceResult
+
 export class Commentator {
 	public set onTransition(value: (lifecycle: Lifecycle, ...args: any[]) => void) {
 		this._fsm.observe('onTransition', value)
 	}
 
+	private _periodicFaceDetectorIntervalMs: number
+	private _periodicFaceDetector: IPeriodicFaceDetector
 	private _commentProvider: ICommentProvider
 	private _faceApi: IMicrosoftFaceApi
 	private _fsm: MyStateMachine
@@ -278,6 +374,8 @@ export class Commentator {
 		commentProvider = new FakeCommentProvider(),
 		faceApi = new FakeMicrosoftFaceApi(),
 		init = 'idle',
+		periodicFaceDetector = new FakePeriodicFaceDetector(() => [fakeFace]),
+		periodicFaceDetectorIntervalMs = 4000,
 		presenceDetector = new FakePresenceDetector(),
 		speech = new FakeSpeech(),
 		videoService = new FakeVideoService(),
@@ -290,6 +388,8 @@ export class Commentator {
 		this._speech = isDefined(speech, 'speech')
 		this._videoService = isDefined(videoService, 'videoService')
 		this._personGroupId = personGroupId
+		this._periodicFaceDetector = periodicFaceDetector
+		this._periodicFaceDetectorIntervalMs = periodicFaceDetectorIntervalMs
 
 		this._doDeliverComments = this._doDeliverComments.bind(this)
 		this._doDetectFacesAsync = this._doDetectFacesAsync.bind(this)
@@ -403,6 +503,9 @@ export class Commentator {
 		} catch (err) {
 			console.error('Failed to detect faces.', err)
 		}
+		this._periodicFaceDetector.start(this._periodicFaceDetectorIntervalMs, () => {
+			return this._videoService.getCurrentImageDataUrl()
+		})
 	}
 
 	private async _doIdentifyFacesAsync(lifecycle: Lifecycle, input: IdentifyFacesInput) {
