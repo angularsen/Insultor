@@ -23,7 +23,7 @@ describe('Commentator', () => {
 			expect(new Commentator({}).state).toBe(State.idle)
 	})
 
-	it('When Idle, `start` should start streaming video and detecting presence', () => {
+	it('Start while idle starts streaming video and detecting presence', () => {
 		const { presenceDetector, videoService } = getMocks()
 		const sm = new Commentator({
 			init: 'idle',
@@ -36,7 +36,7 @@ describe('Commentator', () => {
 		expect(videoService.start).toHaveBeenCalled()
 	})
 
-	it('When not Idle, `start` should do nothing', () => {
+	it('Start is ignored if not idle', () => {
 
 		const { presenceDetector, videoService } = getMocks()
 		const startStates: State[] = ['detectFaces', 'detectPresence', 'identifyFaces', 'deliverComments']
@@ -60,14 +60,27 @@ describe('Commentator', () => {
 		}
 	})
 
-	it('When in `Idle`, action `Start` transitions to `DetectPresence`', () => {
-		const { presenceDetector, videoService } = getMocks()
-		const sm = new Commentator({
-			init: 'idle',
-			presenceDetector,
-		})
-		sm.start()
-		expect(sm.state).toBe(State.detectPresence)
-		expect(presenceDetector.start).toHaveBeenCalled()
+	it('Periodically detects faces while presence is detected', () => {
+		// const { presenceDetector, videoService } = getMocks()
+		// const sm = new Commentator({
+		// 	init: 'idle',
+		// 	presenceDetector,
+		// })
+		// sm.start()
+		// expect(sm.state).toBe(State.detectPresence)
+		// expect(presenceDetector.start).toHaveBeenCalled()
 	})
+
+	it('Stops detecting faces if presence is no longer detected', () => {
+		// todo
+	})
+
+	it('Identifies detected faces', () => {
+		// todo
+	})
+
+	it('If presence is already detected when begin detect presence  Ignore if presence is no longer detected while detecting presence, identifying faces or delivering comments', () => {
+		// todo
+	})
+
 })
