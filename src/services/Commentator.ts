@@ -178,10 +178,11 @@ export interface IPeriodicFaceDetector {
 }
 
 export interface IPresenceDetector {
-	onDetectedChanged?: (detected: boolean) => void
+	readonly onIsDetectedChanged: IEvent<boolean>
 	addMotionScore(motionScore: number, receivedOnDate: Date): void
 	start(): void
 	stop(): void
+	isDetected: boolean
 }
 
 class FakePeriodicFaceDetector implements IPeriodicFaceDetector {
@@ -206,8 +207,12 @@ class FakePeriodicFaceDetector implements IPeriodicFaceDetector {
 	}
 }
 
-class FakePresenceDetector implements IPresenceDetector {
-	public onDetectedChanged: (detected: boolean) => void
+export class FakePresenceDetector implements IPresenceDetector {
+	private _isDetected: boolean = false
+	private _onIsDetectedChanged = new EventDispatcher<boolean>()
+
+	public get onIsDetectedChanged(): IEvent<boolean> { return this._onIsDetectedChanged }
+
 	public start(): void {
 		console.log('FakePresenceDetector: Start detecting presence.')
 	}
@@ -216,6 +221,14 @@ class FakePresenceDetector implements IPresenceDetector {
 	}
 	public addMotionScore(motionScore: number, receivedOnDate: Date): void {
 		console.log('FakePresenceDetector: Added motion score ' + motionScore)
+	}
+	public get isDetected() {
+		return this._isDetected
+	}
+	public set isDetected(isDetected: boolean) {
+		if (isDetected === this._isDetected) { return }
+		this._isDetected = isDetected
+		this._onIsDetectedChanged.dispatch(isDetected)
 	}
 }
 
@@ -274,7 +287,11 @@ export interface IMicrosoftFaceApi {
 	identifyFacesAsync(faceIds: AAGUID[], personGroupId: AAGUID): Promise<IdentifyFacesResponse>
 }
 
-class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
+export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
+	constructor(
+		public detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
+	}
+
 	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person> {
 		const result: Person = {
 			name: 'Fake person name',
@@ -286,16 +303,7 @@ class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	}
 
 	public detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
-		const result: DetectFacesResponse = [
-			{
-				faceAttributes: {
-					age: 35,
-					gender: 'male',
-				},
-				faceId: 'fake face id',
-			} as any,
-		]
-		return Promise.resolve(result)
+		return this.detectFacesAsyncResult
 	}
 
 	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
@@ -310,6 +318,20 @@ class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 		}))
 		return Promise.resolve(result)
 	}
+
+	private static get defaultDetectFacesAsyncResult(): Promise<DetectFacesResponse> {
+		const result: DetectFacesResponse = [
+			{
+				faceAttributes: {
+					age: 35,
+					gender: 'male',
+				},
+				faceId: 'fake face id',
+			} as any,
+		]
+		return Promise.resolve(result)
+	}
+
 }
 
 export interface ICommentProvider {
@@ -415,13 +437,13 @@ export class Commentator {
 		const fsm = new StateMachine(config) as MyStateMachine
 		this._fsm = fsm
 
-		presenceDetector.onDetectedChanged = (detected: boolean) => {
+		presenceDetector.onIsDetectedChanged.subscribe((detected: boolean) => {
 			if (detected) {
 				fsm.presenceDetected()
 			} else {
 				fsm.noPresenceDetected()
 			}
-		}
+		})
 
 		fsm.observe({
 			// States
