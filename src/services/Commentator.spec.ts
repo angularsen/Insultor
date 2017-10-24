@@ -2,25 +2,18 @@ import {} from 'jasmine'
 
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 const jasmineReporters = require('jasmine-reporters')
-// import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
-// import Person from '../../docs/FaceAPI/Person'
+
 import {
 	Commentator,
-	FakeMicrosoftFaceApi,
-	FakePresenceDetector,
-	IMicrosoftFaceApi,
-	IPresenceDetector,
-	IVideoService,
 	State,
 } from './Commentator'
 
+import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
+import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { IPeriodicFaceDetector } from './PeriodicFaceDetector'
+import { IPresenceDetector } from './PresenceDetector'
+import { IVideoService } from './VideoService'
 
-// jasmine.getEnv().addReporter({
-// 	specDone: result => {
-// 		console.log('Heyy', result)
-// 	},
-// })
 jasmine.getEnv().addReporter(new jasmineReporters.TerminalReporter({
 	color: true,
 	showStack: true,

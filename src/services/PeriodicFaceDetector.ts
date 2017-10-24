@@ -22,18 +22,18 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 
 	public get faceDetected(): IEvent<DetectFaceResult[]> { return this._faceDetected }
 
-	constructor(private _intervalMs: number, private _detectFacesAsync: () => Promise<DetectFaceResult[]>) {
-		if (_intervalMs === undefined || _intervalMs <= 0) {
-			throw new Error('intervalMs must be a positive number, was: ' + _intervalMs)
-		}
+	constructor(private _detectFacesAsync: () => Promise<DetectFaceResult[]>) {
 		if (!_detectFacesAsync) {
 			throw new Error('_detectFacesAsync must be a function, was: ' + _detectFacesAsync)
 		}
 	}
 
 	public start(intervalMs: number): void {
+		if (intervalMs === undefined || intervalMs <= 0) {
+			throw new Error('intervalMs must be a positive number, was: ' + intervalMs)
+		}
 		console.info(`FakePeriodicFaceDetector: Start detecting every ${intervalMs} ms.`)
-		this._onPeriodicDetectAsync()
+		this._onPeriodicDetectAsync(intervalMs)
 	}
 
 	public stop(): void {
@@ -41,22 +41,26 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		clearInterval(this._intervalHandle)
 	}
 
-	private async _onPeriodicDetectAsync() {
-		const detectStart = moment()
-		console.info(`FakePeriodicFaceDetector: Detecting faces...`)
-		const detectFacesResult = await this._detectFacesAsync()
+	private async _onPeriodicDetectAsync(intervalMs: number) {
+		try {
+			const detectStart = moment()
+			console.info(`FakePeriodicFaceDetector: Detecting faces...`)
+			const detectFacesResult = await this._detectFacesAsync()
 
-		if (detectFacesResult.length > 0) {
-			console.info(`FakePeriodicFaceDetectorDetected ${detectFacesResult.length} faces.`)
-			this._faceDetected.dispatch(detectFacesResult)
-		} else {
-			console.debug(`FakePeriodicFaceDetectorNo faces detected.`)
+			if (detectFacesResult.length > 0) {
+				console.info(`FakePeriodicFaceDetectorDetected ${detectFacesResult.length} faces.`)
+				this._faceDetected.dispatch(detectFacesResult)
+			} else {
+				console.debug(`FakePeriodicFaceDetectorNo faces detected.`)
+			}
+
+			const durationMs = moment().diff(detectStart)
+			const timeToWaitMs = Math.max(0, intervalMs - durationMs)
+			console.debug(`FakePeriodicFaceDetectorLast request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
+
+			this._intervalHandle = setTimeout(() => this._onPeriodicDetectAsync(intervalMs), timeToWaitMs)
+		} catch (err) {
+			console.error('Failed to periodically detect faces. Will keep trying..', err)
 		}
-
-		const durationMs =  moment().diff(detectStart)
-		const timeToWaitMs = Math.max(0, this._intervalMs - durationMs)
-		console.debug(`FakePeriodicFaceDetectorLast request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
-
-		this._intervalHandle = setTimeout(this._onPeriodicDetectAsync, timeToWaitMs)
 	}
 }

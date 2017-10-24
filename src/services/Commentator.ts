@@ -5,8 +5,19 @@ import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/Detect
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import Person from '../../docs/FaceAPI/Person'
 import Cache from './Cache'
+import { ICommentProvider } from './CommentProvider'
+import { FakeCommentProvider } from './fakes/FakeCommentProvider'
+import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
+import { FakePresenceDetector } from './fakes/FakePresenceDetector'
+import { FakeSpeech } from './fakes/FakeSpeech'
+import { FakeVideoService } from './fakes/FakeVideoService'
+import { IMicrosoftFaceApi } from './MicrosoftFaceApi'
 import { IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
+import { IPresenceDetector } from './PresenceDetector'
+import { ISpeech } from './Speech'
 import { EventDispatcher, IEvent } from './utils/Events'
+import { isDefined, strEnum } from './utils/index'
+import { IVideoService } from './VideoService'
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
@@ -22,14 +33,6 @@ function last(arr: any[]) {
 // tslint:disable:max-classes-per-file
 // tslint:disable-next-line:variable-name
 const StateMachine = require('javascript-state-machine')
-
-/** Utility function to create a K:V from a list of strings */
-function strEnum<T extends string>(o: T[]): {[K in T]: K} {
-	return o.reduce((res, key) => {
-		res[key] = key
-		return res
-	}, Object.create(null))
-}
 
 // tslint:disable-next-line:variable-name
 const Action = strEnum([
@@ -117,151 +120,6 @@ interface MyTransition {
 	to: State
 }
 
-export interface IPresenceDetector {
-	isDetected: boolean
-	readonly onIsDetectedChanged: IEvent<boolean>
-	addMotionScore(motionScore: number, receivedOnDate: Date): void
-	start(): void
-	stop(): void
-}
-
-export class FakePresenceDetector implements IPresenceDetector {
-	private _isDetected: boolean = false
-	private _onIsDetectedChanged = new EventDispatcher<boolean>()
-
-	public get onIsDetectedChanged(): IEvent<boolean> { return this._onIsDetectedChanged }
-
-	public start(): void {
-		console.log('FakePresenceDetector: Start detecting presence.')
-	}
-	public stop(): void {
-		console.log('FakePresenceDetector: Stop detecting presence.')
-	}
-	public addMotionScore(motionScore: number, receivedOnDate: Date): void {
-		console.log('FakePresenceDetector: Added motion score ' + motionScore)
-	}
-	public get isDetected() {
-		return this._isDetected
-	}
-	public set isDetected(isDetected: boolean) {
-		if (isDetected === this._isDetected) { return }
-		this._isDetected = isDetected
-		this._onIsDetectedChanged.dispatch(isDetected)
-	}
-}
-
-export interface ISpeechOpts {
-	voiceURI?: string
-	lang?: string
-	rate?: number
-	pitch?: number
-}
-
-export interface ISpeech {
-	speak(text: string, opts?: ISpeechOpts): void
-}
-
-class FakeSpeech implements ISpeech {
-	public speak(text: string, opts?: ISpeechOpts) {
-		console.log('FakeSpeech: speaking: ' + text)
-	}
-}
-
-/**
- * Handles configuring video source to stream to a <video> HTML element
- * and has actions for starting/stopping video stream.
- */
-export interface IVideoService {
-	/**
-	 * Gets an URL encoded string of the current image data.
-	 */
-	getCurrentImageDataUrl(): string
-	/**
-	 * Start streaming video.
-	 */
-	start(): void
-
-	/**
-	 * Stop streaming video. Will release the camera resource (webcam LED should no longer be lit).
-	 */
-	stop(): void
-}
-
-class FakeVideoService implements IVideoService {
-	public getCurrentImageDataUrl() {
-		return 'Fake image data URL'
-	}
-	public start(): void {
-		console.log('FakeVideoService: Start video.')
-	}
-	public stop(): void {
-		console.log('FakeVideoService: Stop video.')
-	}
-}
-
-export interface IMicrosoftFaceApi {
-	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
-	getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person>
-	identifyFacesAsync(faceIds: AAGUID[], personGroupId: AAGUID): Promise<IdentifyFacesResponse>
-}
-
-export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
-	constructor(
-		public detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
-	}
-
-	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person> {
-		const result: Person = {
-			name: 'Fake person name',
-			persistedFaceIds: ['face face id'],
-			personId: 'fake person id',
-			userData: 'fake person userdata',
-		}
-		return Promise.resolve(result)
-	}
-
-	public detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
-		return this.detectFacesAsyncResult
-	}
-
-	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
-		const result: IdentifyFacesResponse = faceIds.map((faceId, i) => ({
-			candidates: [
-				{
-					confidence: 0.8,
-					personId: 'fake person id for face ' + faceId,
-				},
-			],
-			faceId,
-		}))
-		return Promise.resolve(result)
-	}
-
-	private static get defaultDetectFacesAsyncResult(): Promise<DetectFacesResponse> {
-		const result: DetectFacesResponse = [
-			{
-				faceAttributes: {
-					age: 35,
-					gender: 'male',
-				},
-				faceId: 'fake face id',
-			} as any,
-		]
-		return Promise.resolve(result)
-	}
-
-}
-
-export interface ICommentProvider {
-	getComments(identifyFacesResponse: IdentifyFacesResponse): string[]
-}
-
-class FakeCommentProvider implements ICommentProvider {
-	public getComments(identifyFacesResponse: IdentifyFacesResponse): string[] {
-		return identifyFacesResponse.map((x, i) => 'Fake joke #' + i)
-	}
-}
-
 export interface Lifecycle {
 	transition: string
 	from: State
@@ -279,13 +137,6 @@ export interface CommentatorOptions {
 	faceApi?: IMicrosoftFaceApi
 	commentProvider?: ICommentProvider
 	personGroupId?: AAGUID
-}
-
-function isDefined<T>(myParam: T, msg: string): T {
-	if (myParam === undefined) {
-		throw new Error(`Parameter ${myParam} was undefined.`)
-	}
-	return myParam
 }
 
 // To avoid filling out entire object for the sake of a test
@@ -329,10 +180,7 @@ export class Commentator {
 		this._speech = isDefined(speech, 'speech')
 		this._videoService = isDefined(videoService, 'videoService')
 		this._personGroupId = personGroupId
-
-		this._periodicFaceDetector = periodicFaceDetector ||
-			new PeriodicFaceDetector(periodicFaceDetectorIntervalMs, () => Promise.resolve([fakeFace]))
-
+		this._periodicFaceDetector = periodicFaceDetector || new PeriodicFaceDetector(this._onPeriodicDetectFacesAsync)
 		this._periodicFaceDetectorIntervalMs = periodicFaceDetectorIntervalMs
 
 		this._doDeliverComments = this._doDeliverComments.bind(this)
@@ -515,6 +363,10 @@ export class Commentator {
 		this._videoService.stop()
 	}
 
+	private _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
+		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
+		return this._faceApi.detectFacesAsync(imageDataUrl)
+	}
 }
 
 export default Commentator
