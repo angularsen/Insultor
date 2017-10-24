@@ -1,10 +1,10 @@
-const moment = require('moment-mini')
+import * as  moment from 'moment'
 
 export const MAX_AGE_1DAY = 24 * 3600 * 1000
 
 function getOrPruneIfOld<T>(cacheKey: string): T | undefined {
 	const entryJson = localStorage.getItem(cacheKey)
-	if (entryJson === undefined) { return undefined }
+	if (!entryJson) { return undefined }
 
 	try {
 		const entry = JSON.parse(entryJson)
