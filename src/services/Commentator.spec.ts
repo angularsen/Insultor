@@ -9,11 +9,12 @@ import {
 	FakeMicrosoftFaceApi,
 	FakePresenceDetector,
 	IMicrosoftFaceApi,
-	IPeriodicFaceDetector,
 	IPresenceDetector,
 	IVideoService,
 	State,
 } from './Commentator'
+
+import { IPeriodicFaceDetector } from './PeriodicFaceDetector'
 
 // jasmine.getEnv().addReporter({
 // 	specDone: result => {
