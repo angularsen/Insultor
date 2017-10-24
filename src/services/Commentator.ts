@@ -1,3 +1,6 @@
+import * as moment from 'moment'
+type Moment = moment.Moment
+
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import Person from '../../docs/FaceAPI/Person'
@@ -53,13 +56,13 @@ type MyEventCaller = (...args: any[]) => void
 interface MyStateMachine {
 	// Transitions
 	deliverComments: (input: DeliverCommentsInput) => void
-	commentsDelivered?: MyEventCaller
-	start?: MyEventCaller
-	stop?: MyEventCaller
-	presenceDetected?: MyEventCaller
-	noPresenceDetected?: MyEventCaller
-	facesDetected?: (input: DetectFacesResponse) => void
-	facesIdentified?: (input: IdentifyFacesResponse) => void
+	commentsDelivered: MyEventCaller
+	start: MyEventCaller
+	stop: MyEventCaller
+	presenceDetected: MyEventCaller
+	noPresenceDetected: MyEventCaller
+	facesDetected: (input: DetectFacesResponse) => void
+	facesIdentified: (input: IdentifyFacesResponse) => void
 
 	// Props
 	state: State
@@ -138,7 +141,6 @@ class EventDispatcher<TArgs> implements IEvent<TArgs> {
 }
 
 class EventList<TArgs> {
-
 	private _events: { [name: string]: EventDispatcher<TArgs> } = {}
 
 	public get(name: string): EventDispatcher<TArgs> {
@@ -155,7 +157,7 @@ class EventList<TArgs> {
 	}
 
 	public remove(name: string): void {
-		this._events[name] = null
+		delete this._events[name]
 	}
 }
 
@@ -178,26 +180,30 @@ export interface IPeriodicFaceDetector {
 }
 
 export interface IPresenceDetector {
+	isDetected: boolean
 	readonly onIsDetectedChanged: IEvent<boolean>
 	addMotionScore(motionScore: number, receivedOnDate: Date): void
 	start(): void
 	stop(): void
-	isDetected: boolean
 }
 
-class FakePeriodicFaceDetector implements IPeriodicFaceDetector {
+class PeriodicFaceDetector implements IPeriodicFaceDetector {
 	private _faceDetected = new EventDispatcher<DetectFaceResult[]>()
 	private _intervalHandle: NodeJS.Timer
+	private _lastDetectFaces?: Moment = undefined
 
 	public get faceDetected(): IEvent<DetectFaceResult[]> { return this._faceDetected }
 
-	constructor(private _getFakeResult: () => DetectFaceResult[]) {
+	constructor(private _detectFacesAsync: () => Promise<DetectFaceResult[]>) {
 	}
 
 	public start(intervalMs: number): void {
 		console.info(`FakePeriodicFaceDetector: Start detecting every ${intervalMs} ms.`)
-		this._intervalHandle = setInterval(() => {
-			this._faceDetected.dispatch(this._getFakeResult())
+		this._intervalHandle = setInterval(async () => {
+			const detectFacesResult = await this._detectFacesAsync()
+			if (detectFacesResult.length > 0) {
+				this._faceDetected.dispatch(detectFacesResult)
+			}
 		}, intervalMs)
 	}
 
@@ -386,7 +392,7 @@ export class Commentator {
 	private _periodicFaceDetector: IPeriodicFaceDetector
 	private _commentProvider: ICommentProvider
 	private _faceApi: IMicrosoftFaceApi
-	private _fsm: MyStateMachine
+	private readonly _fsm: MyStateMachine
 	private _personGroupId: AAGUID
 	private _presenceDetector: IPresenceDetector
 	private _speech: ISpeech
@@ -396,7 +402,7 @@ export class Commentator {
 		commentProvider = new FakeCommentProvider(),
 		faceApi = new FakeMicrosoftFaceApi(),
 		init = 'idle',
-		periodicFaceDetector = new FakePeriodicFaceDetector(() => [fakeFace]),
+		periodicFaceDetector = new PeriodicFaceDetector(() => Promise.resolve([fakeFace])),
 		periodicFaceDetectorIntervalMs = 4000,
 		presenceDetector = new FakePresenceDetector(),
 		speech = new FakeSpeech(),
@@ -427,14 +433,17 @@ export class Commentator {
 				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
 				{ from: 'detectFaces', name    : 'facesDetected', to     : 'identifyFaces' },
 				{ from: 'detectFaces', name    : 'noPresenceDetected', to: 'detectPresence' },
+				{ from: 'detectFaces', name    : 'presenceDetected',   to: 'detectFaces' },
 				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
+				{ from: 'identifyFaces', name  : 'presenceDetected',   to: 'identifyFaces' },
 				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: 'detectPresence' },
 				{ from: 'deliverComments', name: 'commentsDelivered', to : 'detectFaces' },
+				{ from: 'deliverComments', name: 'presenceDetected',   to: 'detectPresence' },
 				{ from: 'deliverComments', name: 'noPresenceDetected', to: 'detectPresence' },
 			],
 		}
 
-		const fsm = new StateMachine(config) as MyStateMachine
+		const fsm: MyStateMachine = (new StateMachine(config))!
 		this._fsm = fsm
 
 		presenceDetector.onIsDetectedChanged.subscribe((detected: boolean) => {

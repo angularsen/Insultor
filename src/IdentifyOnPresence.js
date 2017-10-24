@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import moment from 'moment-mini';
+import moment from 'moment';
 
 import Speech from './services/Speech';
 import FaceApi from './services/MsFaceApi';
