@@ -17,6 +17,7 @@ import { IPresenceDetector } from './PresenceDetector'
 import { ISpeech } from './Speech'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { isDefined, strEnum } from './utils/index'
+import { error } from './utils/format'
 import { IVideoService } from './VideoService'
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
@@ -114,10 +115,11 @@ interface MyConfig {
 		onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
 	}
 }
+
 interface MyTransition {
 	name: Action
 	from: '*' | State | State[]
-	to: State
+	to: State | '' // empty for ignore
 }
 
 export interface Lifecycle {
@@ -131,7 +133,7 @@ export interface CommentatorOptions {
 	init?: State
 	videoService?: IVideoService
 	periodicFaceDetector?: IPeriodicFaceDetector
-	periodicFaceDetectorIntervalMs?: number
+	detectFacesIntervalMs?: number
 	presenceDetector?: IPresenceDetector
 	speech?: ISpeech
 	faceApi?: IMicrosoftFaceApi
@@ -146,13 +148,26 @@ const fakeFace = {
 	faceId: 'fake face id',
 } as DetectFaceResult
 
+function withReentryToStateIfEmpty(transition: MyTransition): MyTransition {
+	if (transition.to == '') {
+		// Not sure how we can tell TypeScript that '*' and State[] are not supposed to happen here
+		const from = transition.from as State
+		return {
+			from,
+			to: from,
+			name: transition.name
+		}
+	} else {
+		return transition
+	}
+}
+
 export class Commentator {
 	public set onTransition(value: (lifecycle: Lifecycle, ...args: any[]) => void) {
 		this._fsm.observe('onTransition', value)
 	}
 
-	private _periodicFaceDetectorIntervalMs: number
-	private _periodicFaceDetector: IPeriodicFaceDetector
+	private _faceDetector: IPeriodicFaceDetector
 	private _commentProvider: ICommentProvider
 	private _faceApi: IMicrosoftFaceApi
 	private readonly _fsm: MyStateMachine
@@ -167,7 +182,7 @@ export class Commentator {
 		init = 'idle',
 		// tslint:disable-next-line:no-unnecessary-initializer
 		periodicFaceDetector = undefined,
-		periodicFaceDetectorIntervalMs = 4000,
+		detectFacesIntervalMs = 4000,
 		presenceDetector = new FakePresenceDetector(),
 		speech = new FakeSpeech(),
 		videoService = new FakeVideoService(),
@@ -180,11 +195,10 @@ export class Commentator {
 		this._speech = isDefined(speech, 'speech')
 		this._videoService = isDefined(videoService, 'videoService')
 		this._personGroupId = personGroupId
-		this._periodicFaceDetector = periodicFaceDetector || new PeriodicFaceDetector(this._onPeriodicDetectFacesAsync)
-		this._periodicFaceDetectorIntervalMs = periodicFaceDetectorIntervalMs
+		this._faceDetector = periodicFaceDetector || new PeriodicFaceDetector(detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
 
 		this._doDeliverComments = this._doDeliverComments.bind(this)
-		this._doDetectFacesAsync = this._doDetectFacesAsync.bind(this)
+		this._doDetectFaces = this._doDetectFaces.bind(this)
 		this._doDetectPresence = this._doDetectPresence.bind(this)
 		this._doIdentifyFacesAsync = this._doIdentifyFacesAsync.bind(this)
 		this._doIdle = this._doIdle.bind(this)
@@ -195,49 +209,57 @@ export class Commentator {
 				{ from: '*', name              : 'stop', to              : 'idle' },
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
 				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
+
 				{ from: 'detectFaces', name    : 'facesDetected', to     : 'identifyFaces' },
 				{ from: 'detectFaces', name    : 'noPresenceDetected', to: 'detectPresence' },
-				{ from: 'detectFaces', name    : 'presenceDetected',   to: 'detectFaces' },
+				{ from: 'detectFaces', name    : 'presenceDetected',   to: '' },
+
 				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
-				{ from: 'identifyFaces', name  : 'presenceDetected',   to: 'identifyFaces' },
-				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: 'detectPresence' },
+				{ from: 'identifyFaces', name  : 'presenceDetected',   to: '' },
+				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: '' },
+
 				{ from: 'deliverComments', name: 'commentsDelivered', to : 'detectFaces' },
-				{ from: 'deliverComments', name: 'presenceDetected',   to: 'detectPresence' },
-				{ from: 'deliverComments', name: 'noPresenceDetected', to: 'detectPresence' },
+				{ from: 'deliverComments', name: 'presenceDetected',   to: '' },
+				{ from: 'deliverComments', name: 'noPresenceDetected', to: '' },
 			],
 		}
+
+		// Set up reentry transitions for empty 'to' states
+		config.transitions = config.transitions && config.transitions.map(withReentryToStateIfEmpty)
 
 		const fsm: MyStateMachine = (new StateMachine(config))!
 		this._fsm = fsm
 
-		presenceDetector.onIsDetectedChanged.subscribe((detected: boolean) => {
-			if (detected) {
-				fsm.presenceDetected()
-			} else {
-				fsm.noPresenceDetected()
+		this._presenceDetector.onIsDetectedChanged.subscribe((isPresenceDetected: boolean) => {
+			try {
+			isPresenceDetected ? this.presenceDetected() : this.noPresenceDetected()
+			} catch (err) {
+				console.error('Failed to handle presence detected.', error(err))
+			}
+		})
+
+		this._faceDetector.facesDetected.subscribe((result: DetectFacesResponse) => {
+			try {
+			this.facesDetected(result)
+			} catch (err) {
+				console.error('Failed to handle detected faces.', error(err))
 			}
 		})
 
 		fsm.observe({
 			// States
 			onDeliverComments: this._doDeliverComments,
-			onDetectFaces: this._doDetectFacesAsync,
+			onDetectFaces: this._doDetectFaces,
 			onDetectPresence: this._doDetectPresence,
-			onIdentifyFaces: this._doIdentifyFacesAsync,
+			onIdentifyFaces: (lifetime: Lifecycle, input: IdentifyFacesInput) => { 
+				// Do not await here to not block transition, will run in background
+				this._doIdentifyFacesAsync(input) 
+			},
 			onIdle: this._doIdle,
-			// onEnterdetectPresence: () => console.log('!onDetectPresence!!'), // (lifecycle: Lifecycle) => this._doDetectPresence(lifecycle),
-			// onEnterState: (lifecycle: Lifecycle) => { console.log('OnEnterState: ' + lifecycle.transition)},
-			// onAfterTransition: () => console.log('AFTER TRANSITION'),
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
-				console.log(`onTransition: ${lifecycle.transition} from ${lifecycle.from} to ${lifecycle.to}`)
+				console.log(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 			},
 		})
-
-		// fsm.observe('onIdle', this._doIdle)
-		// fsm.observe('onDetectPresence', this._doDetectPresence)
-		// fsm.observe('onDetectFaces', this._doDetectFacesAsync)
-		// fsm.observe('onIdentifyFaces', this._doIdentifyFacesAsync)
-		// fsm.observe('onDeliverComments', this._doDeliverComments)
 
 		const detectFacesFromCurrentVideoImageAsync = async (): Promise<any> => {
 			console.debug('detectFacesFromCurrentVideoImageAsync')
@@ -284,26 +306,12 @@ export class Commentator {
 			}
 		}
 
-	private async _doDetectFacesAsync(lifecycle: Lifecycle) {
+	private _doDetectFaces() {
 		console.log('doDetectFaces')
-		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-		try {
-			const result = await this._faceApi.detectFacesAsync(imageDataUrl)
-			if (result && result.length > 0) {
-				console.info(`Detected ${result.length} faces.`)
-				this._fsm.facesDetected(result)
-			} else {
-				console.debug('Did not detect any faces.')
-			}
-		} catch (err) {
-			console.error('Failed to detect faces.', err)
-		}
-		this._periodicFaceDetector.start(this._periodicFaceDetectorIntervalMs, () => {
-			return this._videoService.getCurrentImageDataUrl()
-		})
+		this._faceDetector.start()
 	}
 
-	private async _doIdentifyFacesAsync(lifecycle: Lifecycle, input: IdentifyFacesInput) {
+	private async _doIdentifyFacesAsync(input: IdentifyFacesInput) {
 		console.log('doIdentifyFacesAsync')
 		// const imageDataUrl = this._videoService.getCurrentImageDataUrl()
 		try {
