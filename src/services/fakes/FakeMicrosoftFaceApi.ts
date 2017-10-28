@@ -5,7 +5,7 @@ import { IMicrosoftFaceApi } from '../MicrosoftFaceApi'
 
 export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	constructor(
-		public detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
+		private readonly _detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
 	}
 
 	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person> {
@@ -15,11 +15,14 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 			personId: 'fake person id',
 			userData: 'fake person userdata',
 		}
+		console.debug('FakeMicrosoftFaceApi: getPersonAsync() returns', result)
 		return Promise.resolve(result)
 	}
 
-	public detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
-		return this.detectFacesAsyncResult
+	public async detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
+		const result = await this._detectFacesAsyncResult
+		console.debug('FakeMicrosoftFaceApi: detectFacesAsync() returns', result)
+		return result
 	}
 
 	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
@@ -32,6 +35,7 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 			],
 			faceId,
 		}))
+		console.debug('FakeMicrosoftFaceApi: identifyFacesAsync() returns', result)
 		return Promise.resolve(result)
 	}
 

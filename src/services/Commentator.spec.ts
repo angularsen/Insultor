@@ -103,8 +103,8 @@ describe('Commentator', () => {
 
 			const fakeFaceId = 'fake face ID'
 			// Don't detect any faces or the state machine may transition to identifyFaces
-			const noFacesDetectedResult:DetectFacesResponse = [] // Promise.resolve<DetectFacesResponse>([])
-			const singleFaceDetectedResult: DetectFacesResponse = /*Promise.resolve<DetectFacesResponse>(*/[{faceId: fakeFaceId} as DetectFaceResult]//)
+			const noFacesDetectedResult: DetectFacesResponse = []
+			const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
 
 			const fakeFaceApi = new FakeMicrosoftFaceApi(Promise.resolve(noFacesDetectedResult))
 			spyOn(fakeFaceApi, 'detectFacesAsync')
@@ -113,11 +113,11 @@ describe('Commentator', () => {
 				expect(fakeFaceApi.detectFacesAsync).toHaveBeenCalledTimes(num)
 			}
 
-			const FaceDetectInterval = 4000
+			const FACEDETECT_INTERVAL = 4000
 			const sm = new Commentator({
+				detectFacesIntervalMs: FACEDETECT_INTERVAL,
 				faceApi: fakeFaceApi,
 				init: 'idle',
-				periodicFaceDetectorIntervalMs: FaceDetectInterval,
 				presenceDetector: fakePresenceDetector,
 			})
 
@@ -127,43 +127,55 @@ describe('Commentator', () => {
 			// No initial calls
 			expectDetectFacesCallCount(0)
 
+			console.log('TEST: Wait 2 intervals.. no calls to detect faces expected')
+
 			// Do not call while no presence
-			clock.tick(2 * FaceDetectInterval)
+			clock.tick(2 * FACEDETECT_INTERVAL)
 			expectDetectFacesCallCount(0)
 
 			// Immediately call upon presence
+			console.log('TEST: Enter presence detected.. expect immediate call to detect faces')
 			sm.presenceDetected()
 			expect(sm.state).toEqual(State.detectFaces)
 			expectDetectFacesCallCount(1)
 
 			// Detect faces every interval
-			clock.tick(4 * FaceDetectInterval)
+			console.log('TEST: Wait 4 intervals.. expect 4 calls to detect faces')
+			clock.tick(4 * FACEDETECT_INTERVAL)
 			expectDetectFacesCallCount(5)
 
-			// Transition to identify faces
-			sm.facesDetected(singleFaceDetectedResult)
+			// Detect faces to transition to identify faces
+			console.log('TEST: Signal 1 face detected..')
+			sm.facesDetected({detectFacesResult: singleFaceDetectedResult})
 			expect(sm.state).toEqual(State.identifyFaces)
 
 			// Keep detecting faces while identifying previous faces
-			clock.tick(2 * FaceDetectInterval)
+			console.log('TEST: Wait 2 intervals.. expect 2 calls to detect faces')
+			clock.tick(2 * FACEDETECT_INTERVAL)
 			expectDetectFacesCallCount(7)
 
-			sm.facesIdentified([{ faceId: fakeFaceId, candidates: [{ personId: 'fake person ID', confidence: 0.7 }] }])
+			// Identify faces to transition to deliver comments
+			console.log('TEST: Signal 1 face identified..')
+			sm.facesIdentified({
+				detectFacesResult: singleFaceDetectedResult,
+				identifyFacesResult: [{ faceId: fakeFaceId, candidates: [{ personId: 'fake person ID', confidence: 0.7 }] }],
+			})
 			expect(sm.state).toEqual(State.deliverComments)
 
 			// Keep detecting faces while delivering comments
-			clock.tick(1 * FaceDetectInterval)
+			console.log('TEST: Wait 1 intervals.. expect 1 calls to detect faces')
+			clock.tick(1 * FACEDETECT_INTERVAL)
 			expectDetectFacesCallCount(8)
 
 			expect(sm.state).toEqual(State.detectPresence)
 
 			// Keep detecting faces while detecting presence
-			clock.tick(2 * FaceDetectInterval)
+			clock.tick(2 * FACEDETECT_INTERVAL)
 			expectDetectFacesCallCount(9)
 
 		} catch (err) {
-			console.error('Error received', err)
-			throw err.message || err
+			console.error('Error received', err.stack)
+			throw err
 		} finally {
 			clock.uninstall()
 		}

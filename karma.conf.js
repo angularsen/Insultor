@@ -15,7 +15,6 @@ module.exports = function(config) {
 						"dom",
 						"es2017"
 					],
-					// types: ["node", "jasmine"],
 				},
 				coverageOptions: {
 						exclude: [/\.(d|spec)\.ts$/i, /.*node_modules.*/]

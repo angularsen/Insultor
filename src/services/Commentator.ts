@@ -16,8 +16,8 @@ import { IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetec
 import { IPresenceDetector } from './PresenceDetector'
 import { ISpeech } from './Speech'
 import { EventDispatcher, IEvent } from './utils/Events'
-import { isDefined, strEnum } from './utils/index'
 import { error } from './utils/format'
+import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
@@ -61,14 +61,13 @@ type MyEventCaller = (...args: any[]) => void
 
 interface MyStateMachine {
 	// Transitions
-	deliverComments: (input: DeliverCommentsInput) => void
 	commentsDelivered: MyEventCaller
 	start: MyEventCaller
 	stop: MyEventCaller
 	presenceDetected: MyEventCaller
 	noPresenceDetected: MyEventCaller
-	facesDetected: (input: DetectFacesResponse) => void
-	facesIdentified: (input: IdentifyFacesResponse) => void
+	facesDetected: (input: FacesDetectedPayload) => void
+	facesIdentified: (input: FacesIdentifiedPayload) => void
 
 	// Props
 	state: State
@@ -81,7 +80,7 @@ interface MyStateMachine {
 	}
 }
 
-interface IdentifyFacesInput {
+interface FacesDetectedPayload {
 	detectFacesResult: DetectFacesResponse
 }
 
@@ -93,27 +92,27 @@ interface IdentifiedPerson {
 	detectFaceResult: DetectFaceResult
 }
 
-interface DeliverCommentsInput {
-	identifiedPersons: IdentifiedPerson[]
-	unidentifiedFaces: DetectFaceResult[]
+interface FacesIdentifiedPayload {
+	detectFacesResult: DetectFacesResponse
+	identifyFacesResult: IdentifyFacesResponse
 }
 
 interface MyConfig {
 	init?: State | { state: State, event: Action, defer: boolean }
 	transitions?: MyTransition[]
-	callbacks?: {
-		[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
-	}
-	methods?: {
-		onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
-		onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
-	}
+	// callbacks?: {
+	// 	[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
+	// }
+	// methods?: {
+	// 	onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+	// 	onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
+	// 	onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
+	// }
 }
 
 interface MyTransition {
@@ -149,13 +148,13 @@ const fakeFace = {
 } as DetectFaceResult
 
 function withReentryToStateIfEmpty(transition: MyTransition): MyTransition {
-	if (transition.to == '') {
+	if (transition.to === '') {
 		// Not sure how we can tell TypeScript that '*' and State[] are not supposed to happen here
 		const from = transition.from as State
 		return {
 			from,
+			name: transition.name,
 			to: from,
-			name: transition.name
 		}
 	} else {
 		return transition
@@ -167,14 +166,14 @@ export class Commentator {
 		this._fsm.observe('onTransition', value)
 	}
 
-	private _faceDetector: IPeriodicFaceDetector
-	private _commentProvider: ICommentProvider
-	private _faceApi: IMicrosoftFaceApi
+	private readonly _faceDetector: IPeriodicFaceDetector
+	private readonly _commentProvider: ICommentProvider
+	private readonly _faceApi: IMicrosoftFaceApi
 	private readonly _fsm: MyStateMachine
-	private _personGroupId: AAGUID
-	private _presenceDetector: IPresenceDetector
-	private _speech: ISpeech
-	private _videoService: IVideoService
+	private readonly _personGroupId: AAGUID
+	private readonly _presenceDetector: IPresenceDetector
+	private readonly _speech: ISpeech
+	private readonly _videoService: IVideoService
 
 	constructor({
 		commentProvider = new FakeCommentProvider(),
@@ -189,6 +188,13 @@ export class Commentator {
 		personGroupId,
 	}: CommentatorOptions = {}) {
 
+		this._onDeliverComments = this._onDeliverComments.bind(this)
+		this._onDetectFaces = this._onDetectFaces.bind(this)
+		this._onDetectPresence = this._onDetectPresence.bind(this)
+		this._onIdentifyFaces = this._onIdentifyFaces.bind(this)
+		this._onIdle = this._onIdle.bind(this)
+		this._onPeriodicDetectFacesAsync = this._onPeriodicDetectFacesAsync.bind(this)
+
 		this._commentProvider = isDefined(commentProvider, 'commentProvider')
 		this._faceApi = isDefined(faceApi, 'faceApi')
 		this._presenceDetector = isDefined(presenceDetector, 'presenceDetector')
@@ -196,12 +202,6 @@ export class Commentator {
 		this._videoService = isDefined(videoService, 'videoService')
 		this._personGroupId = personGroupId
 		this._faceDetector = periodicFaceDetector || new PeriodicFaceDetector(detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
-
-		this._doDeliverComments = this._doDeliverComments.bind(this)
-		this._doDetectFaces = this._doDetectFaces.bind(this)
-		this._doDetectPresence = this._doDetectPresence.bind(this)
-		this._doIdentifyFacesAsync = this._doIdentifyFacesAsync.bind(this)
-		this._doIdle = this._doIdle.bind(this)
 
 		const config: MyConfig = {
 			init,
@@ -240,7 +240,7 @@ export class Commentator {
 
 		this._faceDetector.facesDetected.subscribe((result: DetectFacesResponse) => {
 			try {
-			this.facesDetected(result)
+				this.facesDetected({ detectFacesResult: result })
 			} catch (err) {
 				console.error('Failed to handle detected faces.', error(err))
 			}
@@ -248,14 +248,11 @@ export class Commentator {
 
 		fsm.observe({
 			// States
-			onDeliverComments: this._doDeliverComments,
-			onDetectFaces: this._doDetectFaces,
-			onDetectPresence: this._doDetectPresence,
-			onIdentifyFaces: (lifetime: Lifecycle, input: IdentifyFacesInput) => { 
-				// Do not await here to not block transition, will run in background
-				this._doIdentifyFacesAsync(input) 
-			},
-			onIdle: this._doIdle,
+			onDeliverComments: this._onDeliverComments,
+			onDetectFaces: this._onDetectFaces,
+			onDetectPresence: this._onDetectPresence,
+			onIdentifyFaces: this._onIdentifyFaces,
+			onIdle: this._onIdle,
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
 				console.log(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 			},
@@ -269,91 +266,109 @@ export class Commentator {
 	public stop = () => this._fsm.stop()
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
-	public facesDetected(detectFacesResult: DetectFacesResponse) { this._fsm.facesDetected(detectFacesResult) }
-	public facesIdentified(identifyFacesResult: IdentifyFacesResponse) { this._fsm.facesIdentified(identifyFacesResult) }
+	public facesDetected(payload: FacesDetectedPayload) { this._fsm.facesDetected(payload) }
+	public facesIdentified(payload: FacesIdentifiedPayload) { this._fsm.facesIdentified(payload) }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
 
 	// State handlers
-	private _doDeliverComments(lifecycle: Lifecycle, input: DeliverCommentsInput) {
-			console.log('onDeliverComments')
+	private _onDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
+		console.log('onDeliverComments')
+		// Do not await here to not block state transition
+		this._deliverCommentsAsync(input)
+	}
 
-			// TODO Insert contextual comments here
-			const faceComments = input.unidentifiedFaces.map((x, i) => 'Face comment ' + i)
-			const personComments = input.identifiedPersons.map((x, i) => 'Person comment ' + i)
-			const comments = personComments.concat(faceComments)
+	private async _deliverCommentsAsync(input: FacesIdentifiedPayload): Promise<void> {
+		const MIN_CONFIDENCE = 0.5
 
-			for (const comment of comments) {
-				this._speech.speak(comment)
+		const identifiedFaces = input.identifyFacesResult
+			.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
+
+		const unidentifiedFaces = input.detectFacesResult
+			.filter(detectedFace => identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
+
+		console.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
+
+		console.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
+		const groupId = this._personGroupId
+		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
+			const personId = identifiedFace.candidates[0].personId
+			const cacheKey = `MS_FACEAPI_GET_PERSON:group[${groupId}]:person[${personId}]`
+			const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(groupId, personId))
+
+			return {
+				identifiedFace,
+				person,
 			}
-		}
+		}))
 
-	private _doDetectFaces() {
+		const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map(x => ({
+			confidence: x.identifiedFace.candidates[0].confidence,
+			detectFaceResult: input.detectFacesResult.find(df => df.faceId === x.identifiedFace.faceId)!, // guaranteed to find faceId
+			firstName: x.person.name.split(' ')[0],
+			lastName: last(x.person.name.split(' ')),
+			personId: x.person.personId,
+		}))
+
+		// TODO Insert contextual comments here
+		const faceComments = unidentifiedFaces.map((x, i) => 'Face comment ' + i)
+		const personComments = identifiedPersons.map((x, i) => 'Person comment ' + i)
+		const comments = personComments.concat(faceComments)
+
+		for (const comment of comments) {
+			this._speech.speak(comment)
+		}
+	}
+
+	private _onDetectFaces() {
 		console.log('doDetectFaces')
 		this._faceDetector.start()
 	}
 
-	private async _doIdentifyFacesAsync(input: IdentifyFacesInput) {
+	private _onIdentifyFaces(lifecycle: Lifecycle, payload: FacesDetectedPayload) {
+		// Do not await here to not block transition, will run in background
+		this._identifyFacesAsync(payload)
+	}
+
+	private async _identifyFacesAsync(payload: FacesDetectedPayload): Promise<void> {
 		console.log('doIdentifyFacesAsync')
-		// const imageDataUrl = this._videoService.getCurrentImageDataUrl()
 		try {
-			const detectedFaces = input.detectFacesResult
-			if (!detectedFaces || detectedFaces.length === 0) { throw new Error('No detected faces were given.') }
+			const detectFacesResponse = payload.detectFacesResult
+			if (!detectFacesResponse || detectFacesResponse.length === 0) {
+				console.debug('payload', payload)
+				throw new Error('No detected faces were given.')
+			}
 
-			const faceIds = detectedFaces.map(x => x.faceId)
+			const faceIds = detectFacesResponse.map(x => x.faceId)
 
-			console.debug(`Identifying ${detectedFaces.length} faces...`)
-			const result = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
+			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
+			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
 
-			const MIN_CONFIDENCE = 0.5
-			const identifiedFaces = result.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
-			const unidentifiedFaces = detectedFaces.filter(detectedFace => identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
-
-			console.info(`Identified ${identifiedFaces.length}/${result.length} faces.`)
-
-			console.debug(`Get person info ${detectedFaces.length} faces...`)
-			const groupId = this._personGroupId
-			const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
-				const personId = identifiedFace.candidates[0].personId
-				const cacheKey = `MS_FACEAPI_GET_PERSON:group[${groupId}]:person[${personId}]`
-				const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(groupId, personId))
-
-				return {
-					identifiedFace,
-					person,
-				}
-			}))
-
-			const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map(x => ({
-				confidence: x.identifiedFace.candidates[0].confidence,
-				detectFaceResult: detectedFaces.find(df => df.faceId === x.identifiedFace.faceId)!, // guaranteed to find faceId
-				firstName: x.person.name.split(' ')[0],
-				lastName: last(x.person.name.split(' ')),
-				personId: x.person.personId,
-			}))
-
-			this._fsm.deliverComments({
-				identifiedPersons,
-				unidentifiedFaces,
+			// Identified faces (or not, commenting will handle anonymous faces)
+			this.facesIdentified({
+				detectFacesResult: detectFacesResponse,
+				identifyFacesResult: identifyFacesResponse,
 			})
 		} catch (err) {
-			console.error('Failed to detect faces.', err)
+			console.error('Failed to detect faces.', error(err))
 		}
 	}
 
-	private _doDetectPresence(lifecycle: Lifecycle) {
+	private _onDetectPresence(lifecycle: Lifecycle) {
 		console.log('doDetectPresence')
 		this._videoService.start()
 		this._presenceDetector.start()
 	}
 
-	private _doIdle(lifecycle: Lifecycle) {
+	private _onIdle(lifecycle: Lifecycle) {
 		console.log('doIdle')
 		this._presenceDetector.stop()
 		this._videoService.stop()
 	}
 
 	private _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
+		console.debug('Commentator: On periodically detect faces...')
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
+		console.debug('Commentator: Got image data url')
 		return this._faceApi.detectFacesAsync(imageDataUrl)
 	}
 }

@@ -14,6 +14,7 @@ export interface IVideoService {
 	 * Gets an URL encoded string of the current image data.
 	 */
 	getCurrentImageDataUrl(): string
+
 	/**
 	 * Start streaming video.
 	 */

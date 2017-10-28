@@ -5,7 +5,7 @@ import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/Detect
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import {isDefined } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
-import { error } from './utils/format';
+import { error } from './utils/format'
 
 export interface IPeriodicFaceDetector {
 	readonly facesDetected: IEvent<DetectFacesResponse>
@@ -22,10 +22,9 @@ export interface IPeriodicFaceDetector {
 export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 	public get facesDetected(): IEvent<DetectFacesResponse> { return this._faceDetected }
 
-	private _isRunning: boolean;
+	private _isRunning: boolean
 	private _faceDetected = new EventDispatcher<DetectFacesResponse>()
 	private _timeoutHandle?: NodeJS.Timer
-
 
 	constructor(
 		private _intervalMs: number,
@@ -37,6 +36,8 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		if (_intervalMs < 0) {
 			throw new Error('Interval must be a positive number, was: ' + _intervalMs)
 		}
+
+		this._detectFacesAsync = this._detectFacesAsync.bind(this)
 	}
 
 	public start(): void {
@@ -60,15 +61,16 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 	}
 
 	private async _onDetectFacesAsync(intervalMs: number): Promise<any> {
-		if (!this._isRunning) { 
+		if (!this._isRunning) {
 			console.info('PeriodicFaceDetector: Already stopped, returning early.')
-			return 
+			return
 		}
 
 		try {
 			const detectStart = moment()
 			console.info(`FakePeriodicFaceDetector: Detecting faces...`)
 			const detectFacesResult = await this._detectFacesAsync()
+			if (detectFacesResult === undefined) { throw new Error('No detect faces result.') }
 
 			if (!this._isRunning) {
 				console.info('PeriodicFaceDetector: Stopped while waiting for detect faces.')
