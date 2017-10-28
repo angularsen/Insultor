@@ -260,25 +260,6 @@ export class Commentator {
 				console.log(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 			},
 		})
-
-		const detectFacesFromCurrentVideoImageAsync = async (): Promise<any> => {
-			console.debug('detectFacesFromCurrentVideoImageAsync')
-			const imageDataUrl = videoService.getCurrentImageDataUrl()
-			const detectFacesResult = await faceApi.detectFacesAsync(imageDataUrl)
-			if (detectFacesResult.length) {
-				fsm.facesDetected(detectFacesResult)
-			}
-		}
-
-		fsm.observe('onDetectFaces', async (): Promise<any> => {
-			console.log('onDetectFaces')
-
-			while (fsm.state === 'detectFaces') {
-				await detectFacesFromCurrentVideoImageAsync()
-				await timeout(4000)
-			}
-		})
-
 	}
 
 	get state(): State { return this._fsm.state }
