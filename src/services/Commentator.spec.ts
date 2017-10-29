@@ -9,6 +9,7 @@ import {
 } from './Commentator'
 
 import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
+import { FakePeriodicFaceDetector } from './fakes/FakePeriodicFaceDetector'
 import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { IPeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
@@ -20,24 +21,20 @@ jasmine.getEnv().addReporter(new jasmineReporters.TerminalReporter({
 	verbosity: 3,
 }))
 
+function delayAsync(ms: number): Promise<void> {
+	return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 // tslint:disable:max-classes-per-file
 // tslint:disable:no-var-requires
 
 const mockPresenceDetector: () => IPresenceDetector = () => jasmine.createSpyObj('presenceDetector', { start: 0, stop: 0 })
 const mockVideoService: () => IVideoService = () => jasmine.createSpyObj('videoStreamer', { start: 0, stop: 0 })
-const mockPeriodicFaceDetector: () => IPeriodicFaceDetector = () => jasmine.createSpyObj('periodicFaceDetector', { start: 0, stop: 0 })
-// const mockFaceApi: () => IMicrosoftFaceApi = () => jasmine.createSpyObj('faceApi', {
-// 	detectFacesAsync: Promise<DetectFacesResponse>.resolve({})
-// 	getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person>
-// 	identifyFacesAsync(faceIds: AAGUID[], personGroupId: AAGUID): Promise<IdentifyFacesResponse>
-
-// })
+const mockFaceDetector: () => IPeriodicFaceDetector = () => jasmine.createSpyObj('faceDetector', { start: 0, stop: 0 })
 
 const getMocks = () => ({
-	periodicFaceDetectorMock: mockPeriodicFaceDetector(),
 	presenceDetectorMock: mockPresenceDetector(),
 	videoServiceMock: mockVideoService(),
-	// faceApiMock: mockFaceApi()
 })
 
 describe('Commentator', () => {
@@ -93,91 +90,94 @@ describe('Commentator', () => {
 		}
 	})
 
-	it('Periodically detects faces while presence is detected', () => {
-		const clock = jasmine.clock()
-		clock.install()
+	it('Starts periodic face detector on presence detected', () => {
 		try {
-			// TODO Hang the identify call so state machine doesn't progress automatically detect-identify-comment
-
 			const fakePresenceDetector = new FakePresenceDetector()
 
-			const fakeFaceId = 'fake face ID'
-			// Don't detect any faces or the state machine may transition to identifyFaces
-			const noFacesDetectedResult: DetectFacesResponse = []
-			const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
+			// const fakeFaceId = 'fake face ID'
+			// const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
+			// const fakeFaceApi = new FakeMicrosoftFaceApi(Promise.resolve(singleFaceDetectedResult))
 
-			const fakeFaceApi = new FakeMicrosoftFaceApi(Promise.resolve(noFacesDetectedResult))
-			spyOn(fakeFaceApi, 'detectFacesAsync')
+			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
+			spyOn(fakePeriodicFaceDetector, 'start')
 
-			const expectDetectFacesCallCount = (num: number) => {
-				expect(fakeFaceApi.detectFacesAsync).toHaveBeenCalledTimes(num)
-			}
-
-			const FACEDETECT_INTERVAL = 4000
-			const sm = new Commentator({
-				detectFacesIntervalMs: FACEDETECT_INTERVAL,
-				faceApi: fakeFaceApi,
+			const comm = new Commentator({
+				// faceApi: fakeFaceApi,
+				faceDetector: fakePeriodicFaceDetector,
 				init: 'idle',
 				presenceDetector: fakePresenceDetector,
+				videoService: mockVideoService(),
 			})
 
-			sm.start()
-			expect(sm.state).toEqual(State.detectPresence)
+			console.log('TEST: Signal start..')
+			comm.start()
+			expect(comm.state).toEqual(State.detectPresence)
 
-			// No initial calls
-			expectDetectFacesCallCount(0)
+			console.log('TEST: Signal presence detected..')
+			comm.presenceDetected()
+			expect(comm.state).toEqual(State.detectFaces)
 
-			console.log('TEST: Wait 2 intervals.. no calls to detect faces expected')
-
-			// Do not call while no presence
-			clock.tick(2 * FACEDETECT_INTERVAL)
-			expectDetectFacesCallCount(0)
-
-			// Immediately call upon presence
-			console.log('TEST: Enter presence detected.. expect immediate call to detect faces')
-			sm.presenceDetected()
-			expect(sm.state).toEqual(State.detectFaces)
-			expectDetectFacesCallCount(1)
-
-			// Detect faces every interval
-			console.log('TEST: Wait 4 intervals.. expect 4 calls to detect faces')
-			clock.tick(4 * FACEDETECT_INTERVAL)
-			expectDetectFacesCallCount(5)
-
-			// Detect faces to transition to identify faces
-			console.log('TEST: Signal 1 face detected..')
-			sm.facesDetected({detectFacesResult: singleFaceDetectedResult})
-			expect(sm.state).toEqual(State.identifyFaces)
-
-			// Keep detecting faces while identifying previous faces
-			console.log('TEST: Wait 2 intervals.. expect 2 calls to detect faces')
-			clock.tick(2 * FACEDETECT_INTERVAL)
-			expectDetectFacesCallCount(7)
-
-			// Identify faces to transition to deliver comments
-			console.log('TEST: Signal 1 face identified..')
-			sm.facesIdentified({
-				detectFacesResult: singleFaceDetectedResult,
-				identifyFacesResult: [{ faceId: fakeFaceId, candidates: [{ personId: 'fake person ID', confidence: 0.7 }] }],
-			})
-			expect(sm.state).toEqual(State.deliverComments)
-
-			// Keep detecting faces while delivering comments
-			console.log('TEST: Wait 1 intervals.. expect 1 calls to detect faces')
-			clock.tick(1 * FACEDETECT_INTERVAL)
-			expectDetectFacesCallCount(8)
-
-			expect(sm.state).toEqual(State.detectPresence)
-
-			// Keep detecting faces while detecting presence
-			clock.tick(2 * FACEDETECT_INTERVAL)
-			expectDetectFacesCallCount(9)
-
+			expect(fakePeriodicFaceDetector.start).toHaveBeenCalledTimes(1)
 		} catch (err) {
 			console.error('Error received', err.stack)
 			throw err
-		} finally {
-			clock.uninstall()
+		}
+	})
+
+	it('Stops periodic face detector on presence not detected', () => {
+		try {
+			const fakePresenceDetector = new FakePresenceDetector()
+			fakePresenceDetector.isDetected = true
+
+			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
+			spyOn(fakePeriodicFaceDetector, 'stop')
+
+			const comm = new Commentator({
+				init: 'detectFaces',
+				presenceDetector: fakePresenceDetector,
+				faceDetector: fakePeriodicFaceDetector,
+				videoService: mockVideoService(),
+			})
+
+			expect(fakePeriodicFaceDetector.stop).toHaveBeenCalledTimes(0)
+			fakePresenceDetector.isDetected = false
+			expect(comm.state).toEqual(State.detectPresence)
+			expect(fakePeriodicFaceDetector.stop).toHaveBeenCalledTimes(1)
+		} catch (err) {
+			console.error('Error received', err.stack)
+			throw err
+		}
+	})
+
+	it('Completes a full state cycle from idle to deliver comments back to idle', () => {
+		try {
+			const fakePresenceDetector = new FakePresenceDetector()
+			fakePresenceDetector.isDetected = false
+
+			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
+			spyOn(fakePeriodicFaceDetector, 'stop')
+
+			const comm = new Commentator({
+				init: 'idle',
+				presenceDetector: fakePresenceDetector,
+				faceDetector: fakePeriodicFaceDetector,
+				videoService: mockVideoService(),
+			})
+
+			comm.start()
+			expect(comm.state).toEqual(State.detectPresence)
+
+			fakePresenceDetector.isDetected = true
+			expect(comm.state).toEqual(State.detectFaces)
+
+			expect(fakePeriodicFaceDetector.stop).toHaveBeenCalledTimes(0)
+			fakePresenceDetector.isDetected = false
+			expect(comm.state).toEqual(State.detectPresence)
+
+			throw new Error('TODO Implement full cycle')
+		} catch (err) {
+			console.error('Error received', err.stack)
+			throw err
 		}
 	})
 

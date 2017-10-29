@@ -2,7 +2,6 @@ import * as moment from 'moment'
 type Moment = moment.Moment
 
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
-import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import {isDefined } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { error } from './utils/format'
@@ -38,6 +37,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		}
 
 		this._detectFacesAsync = this._detectFacesAsync.bind(this)
+		this._onDetectFacesAsync = this._onDetectFacesAsync.bind(this)
 	}
 
 	public start(): void {
@@ -45,7 +45,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		this._isRunning = true
 
 		const intervalMs = this._intervalMs
-		console.info(`FakePeriodicFaceDetector: Start detecting every ${intervalMs} ms.`)
+		console.info(`PeriodicFaceDetector: Start detecting every ${intervalMs} ms.`)
 		this._onDetectFacesAsync(intervalMs)
 	}
 
@@ -53,7 +53,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		if (!this._isRunning) { throw new Error('Already stopped.') }
 		this._isRunning = false
 
-		console.info(`FakePeriodicFaceDetector: Stopping.`)
+		console.info(`PeriodicFaceDetector: Stopping.`)
 		if (this._timeoutHandle) {
 			clearTimeout(this._timeoutHandle)
 			this._timeoutHandle = undefined
@@ -66,11 +66,13 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 			return
 		}
 
+		let timeToWaitMs = 0
 		try {
 			const detectStart = moment()
-			console.info(`FakePeriodicFaceDetector: Detecting faces...`)
+			console.info(`PeriodicFaceDetector: Detecting faces...`)
+			console.debug(`PeriodicFaceDetector: this._detectFacesAsync: `, this._detectFacesAsync)
 			const detectFacesResult = await this._detectFacesAsync()
-			if (detectFacesResult === undefined) { throw new Error('No detect faces result.') }
+			if (detectFacesResult === undefined) { throw new Error('No detect faces result, this is likely a bug.') }
 
 			if (!this._isRunning) {
 				console.info('PeriodicFaceDetector: Stopped while waiting for detect faces.')
@@ -78,28 +80,21 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 			}
 
 			if (detectFacesResult.length > 0) {
-				console.info(`FakePeriodicFaceDetector: Detected ${detectFacesResult.length} faces.`)
+				console.info(`PeriodicFaceDetector: Detected ${detectFacesResult.length} faces.`)
 				this._faceDetected.dispatch(detectFacesResult)
-
-				// const identifyFacesResult = await this._identifyFacesAsync(detectFacesResult)
-				// if (!this._isRunning) {
-				// 	console.info('PeriodicFaceDetector: Stopped while waiting for identify faces.')
-				// 	return
-				// }
-				// this._facesIdentified.dispatch(identifyFacesResult)
-
 			} else {
-				console.debug(`FakePeriodicFaceDetector: No faces detected.`)
+				console.debug(`PeriodicFaceDetector: No faces detected.`)
 			}
 
 			const durationMs = moment().diff(detectStart)
-			const timeToWaitMs = Math.max(0, intervalMs - durationMs)
-			console.debug(`FakePeriodicFaceDetector: Last request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
-
-			return setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
+			timeToWaitMs = Math.max(0, intervalMs - durationMs)
+			console.debug(`PeriodicFaceDetector: Last request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
 		} catch (err) {
 			console.error('Failed to periodically detect faces. Will keep trying..', error(err))
 			return undefined
+		} finally {
+			console.debug(`PeriodicFaceDetector: Queue next detect faces in ${timeToWaitMs} ms.`)
+			return setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
 		}
 	}
 }

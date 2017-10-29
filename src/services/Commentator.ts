@@ -103,16 +103,18 @@ interface MyConfig {
 	// callbacks?: {
 	// 	[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
 	// }
-	// methods?: {
-	// 	onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-	// 	onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
-	// 	onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
-	// }
+	methods?: {
+		onInvalidTransition: (transition: string, from: State, to: State) => void,
+		onPendingTransition: (transition: string, from: State, to: State) => void,
+		// 	onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
+		// 	onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
+		// 	onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
+	}
 }
 
 interface MyTransition {
@@ -131,7 +133,7 @@ export interface CommentatorOptions {
 	onTransition?: (lifecycle: Lifecycle, ...args: any[]) => void
 	init?: State
 	videoService?: IVideoService
-	periodicFaceDetector?: IPeriodicFaceDetector
+	faceDetector?: IPeriodicFaceDetector
 	detectFacesIntervalMs?: number
 	presenceDetector?: IPresenceDetector
 	speech?: ISpeech
@@ -180,7 +182,7 @@ export class Commentator {
 		faceApi = new FakeMicrosoftFaceApi(),
 		init = 'idle',
 		// tslint:disable-next-line:no-unnecessary-initializer
-		periodicFaceDetector = undefined,
+		faceDetector = undefined,
 		detectFacesIntervalMs = 4000,
 		presenceDetector = new FakePresenceDetector(),
 		speech = new FakeSpeech(),
@@ -201,10 +203,18 @@ export class Commentator {
 		this._speech = isDefined(speech, 'speech')
 		this._videoService = isDefined(videoService, 'videoService')
 		this._personGroupId = personGroupId
-		this._faceDetector = periodicFaceDetector || new PeriodicFaceDetector(detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
+		this._faceDetector = faceDetector || new PeriodicFaceDetector(detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
 
 		const config: MyConfig = {
 			init,
+			methods: {
+				onInvalidTransition(transition: string, from: State, to: State) {
+					throw new Error(`Transition [${transition}] not allowed from [${from}]`)
+				},
+				onPendingTransition(transition: string, from: State, to: State) {
+					throw new Error(`Transition [${transition}] not allowed from [${from} => ${to}], a transition already pending.`)
+				},
+			},
 			transitions: [
 				{ from: '*', name              : 'stop', to              : 'idle' },
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
@@ -349,14 +359,18 @@ export class Commentator {
 				identifyFacesResult: identifyFacesResponse,
 			})
 		} catch (err) {
-			console.error('Failed to detect faces.', error(err))
+			console.error('Failed to identify faces.', error(err))
 		}
 	}
 
 	private _onDetectPresence(lifecycle: Lifecycle) {
 		console.log('doDetectPresence')
-		this._videoService.start()
-		this._presenceDetector.start()
+		if (lifecycle.from === 'idle') {
+			this._videoService.start()
+			this._presenceDetector.start()
+		} else {
+			this._faceDetector.stop()
+		}
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
@@ -365,11 +379,13 @@ export class Commentator {
 		this._videoService.stop()
 	}
 
-	private _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
+	private async _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
 		console.debug('Commentator: On periodically detect faces...')
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-		console.debug('Commentator: Got image data url')
-		return this._faceApi.detectFacesAsync(imageDataUrl)
+		console.debug('Commentator: Got image data url, detecting faces...', this._faceApi, this._faceApi.detectFacesAsync)
+		const result = await this._faceApi.detectFacesAsync(imageDataUrl)
+		console.debug('Commentator: detect faces result', result)
+		return result
 	}
 }
 
