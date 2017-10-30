@@ -181,6 +181,13 @@ export class Commentator {
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
 
+	/**
+	 * Buffer of detected faces, which is drained whenever in detectFaces state.
+	 * When in any other state, it is buffered in order to queue up while identifying/commenting
+	 * on a previous faces, which can take several seconds.
+	 */
+	private _facesDetectedBuffer: DetectFaceResult[] = []
+
 	constructor({
 		commentProvider = new FakeCommentProvider(),
 		faceApi = new FakeMicrosoftFaceApi(),
@@ -284,7 +291,10 @@ export class Commentator {
 	public stop = () => this._fsm.stop()
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
-	public facesDetected(payload: FacesDetectedPayload) { this._fsm.facesDetected(payload) }
+	public facesDetected(payload: FacesDetectedPayload) {
+		this._facesDetectedBuffer.push(...payload.detectFacesResult)
+		this._fsm.facesDetected(payload)
+	}
 	public facesIdentified(payload: FacesIdentifiedPayload) { this._fsm.facesIdentified(payload) }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
 
@@ -357,14 +367,18 @@ export class Commentator {
 		this.commentsDelivered()
 	}
 
-	private _onDetectFaces() {
+	private _onDetectFaces(lifecycle: Lifecycle) {
 		console.log('doDetectFaces')
-		this._faceDetector.start()
+		if (lifecycle.from === 'idle') {
+			this._faceDetector.start()
+		}
 	}
 
 	private _onIdentifyFaces(lifecycle: Lifecycle, payload: FacesDetectedPayload) {
 		// Do not await here to not block transition, will run in background
-		this._identifyFacesAsync(payload)
+		rstsrtsr
+		// TODO REMOVE PAYLOAD?
+		this._identifyFacesAsync({ detectFacesResult: this._facesDetectedBuffer })
 	}
 
 	private async _identifyFacesAsync(payload: FacesDetectedPayload): Promise<void> {
@@ -397,6 +411,7 @@ export class Commentator {
 		if (lifecycle.from === 'idle') {
 			this._videoService.start()
 			this._presenceDetector.start()
+			this._facesDetectedBuffer = [] // clear buffer
 		} else {
 			this._faceDetector.stop()
 		}
@@ -406,6 +421,7 @@ export class Commentator {
 		console.log('doIdle')
 		this._presenceDetector.stop()
 		this._videoService.stop()
+		this._faceDetector.stop()
 	}
 
 	private async _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {

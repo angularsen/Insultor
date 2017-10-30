@@ -25,6 +25,24 @@ function delayAsync(ms: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function waitForCondition(name: string, checkCondition: () => boolean, intervalMs: number, timeoutMs: number): Promise<void> {
+	let intervalHandle: number
+
+	return new Promise((resolve, reject) => {
+		const timeoutHandle = setTimeout(() => {
+			reject(new Error('Timed out: ' + name))
+			clearInterval(intervalHandle)
+		})
+
+		intervalHandle = setInterval(() => {
+			if (checkCondition()) {
+				resolve()
+				clearTimeout(timeoutHandle)
+			}
+		})
+	})
+}
+
 // tslint:disable:max-classes-per-file
 // tslint:disable:no-var-requires
 
@@ -189,46 +207,62 @@ describe('Commentator', () => {
 		try {
 			const fakePresenceDetector = new FakePresenceDetector()
 			const fakeFaceDetector = new FakePeriodicFaceDetector()
+			const fakeFaceApi = new FakeMicrosoftFaceApi()
+			spyOn(fakeFaceApi, 'identifyFacesAsync').and.callThrough()
 
 			const comm = new Commentator({
-				faceApi: new FakeMicrosoftFaceApi(),
+				faceApi: fakeFaceApi,
 				faceDetector: fakeFaceDetector,
 				init: 'idle',
 				presenceDetector: fakePresenceDetector,
 				videoService: mockVideoService(),
 			})
 
-			fakePresenceDetector.isDetected = true
 			comm.start()
+			fakePresenceDetector.isDetected = true
 
+			const getDetectFaceResult = (faceId: string): DetectFaceResult => {
+				// Intentionally only populate part of it
+				// tslint:disable-next-line:no-object-literal-type-assertion
+				return {
+					faceId: 'fake face 2',
+				} as DetectFaceResult
+			}
+
+			const [face2, face3, face4] = [2, 3, 4].map(id => getDetectFaceResult('fake face id ' + id))
+
+			let deliverCommentsCount = 0
 			comm.onTransition.subscribe((lifecycle) => {
 				switch (lifecycle.to) {
 					case 'identifyFaces': {
-						fakeFaceDetector.facesDetectedDispatcher.dispatch([face1, face2])
+						// Add two faces while identifying face1
+						fakeFaceDetector.facesDetectedDispatcher.dispatch([face2, face3])
 						break
 					}
 					case 'deliverComments': {
-						fakeFaceDetector.facesDetectedDispatcher.dispatch([face3])
+						// Add one face while commenting on face1
+						fakeFaceDetector.facesDetectedDispatcher.dispatch([face4])
+						deliverCommentsCount++
 						break
 					}
 				}
 			})
 
 			const waitForDetectFaces: Promise<void> = comm.waitForState('detectFaces', 1000)
+
+			// Raise face 1 detected
 			fakeFaceDetector.facesDetectedDispatcher.dispatch(singleFaceDetectedResult)
 
-			await waitForDetectFaces
-			fakePresenceDetector.isDetected = false
+			await waitForCondition('deliverCommentsCount === 2', () => deliverCommentsCount === 2, 50, 1000)
 
-			comm.stop()
-
+			// Two full cycles should occur due to additional faces detected while identifying/commenting
 			expect(comm.history).toEqual(
-				['idle', 'detectPresence', 'detectFaces', 'identifyFaces', 'deliverComments', 'detectFaces', 'detectPresence', 'idle'])
+				['idle', 'detectPresence', 'detectFaces', 'identifyFaces', 'deliverComments',
+				'detectFaces', 'identifyFaces', 'identifyFaces', 'deliverComments', 'detectFaces', 'identifyFaces'])
 		} catch (err) {
 			console.error('Error received', err.stack || err)
 			fail(err)
 		} finally {
-			fail('todo')
 			done()
 		}
 	})
@@ -238,6 +272,10 @@ describe('Commentator', () => {
 	// })
 
 	// it('Delivers comments based on face attributes to unidentified faces', () => {
+	// 	fail('todo')
+	// })
+
+	// it('Delivers only one comment per face', () => {
 	// 	fail('todo')
 	// })
 
