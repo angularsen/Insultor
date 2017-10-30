@@ -37,6 +37,9 @@ const getMocks = () => ({
 	videoServiceMock: mockVideoService(),
 })
 
+const fakeFaceId = 'fake face ID'
+const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
+
 describe('Commentator', () => {
 	beforeEach((done) => {
 		try {
@@ -79,9 +82,9 @@ describe('Commentator', () => {
 			})
 
 			let gotTransition = false
-			sm.onTransition = (lifecycle) => {
+			sm.onTransition.subscribe((lifecycle) => {
 				gotTransition = true
-			}
+			})
 
 			expect(() => sm.start()).toThrow()
 
@@ -94,8 +97,6 @@ describe('Commentator', () => {
 		try {
 			const fakePresenceDetector = new FakePresenceDetector()
 
-			// const fakeFaceId = 'fake face ID'
-			// const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
 			// const fakeFaceApi = new FakeMicrosoftFaceApi(Promise.resolve(singleFaceDetectedResult))
 
 			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
@@ -133,9 +134,9 @@ describe('Commentator', () => {
 			spyOn(fakePeriodicFaceDetector, 'stop')
 
 			const comm = new Commentator({
+				faceDetector: fakePeriodicFaceDetector,
 				init: 'detectFaces',
 				presenceDetector: fakePresenceDetector,
-				faceDetector: fakePeriodicFaceDetector,
 				videoService: mockVideoService(),
 			})
 
@@ -149,49 +150,88 @@ describe('Commentator', () => {
 		}
 	})
 
-	it('Completes a full state cycle from idle to deliver comments back to idle', () => {
+	it('Completes a full state cycle from idle to deliver comments and back to idle', async (done) => {
 		try {
 			const fakePresenceDetector = new FakePresenceDetector()
-			fakePresenceDetector.isDetected = false
-
-			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
-			spyOn(fakePeriodicFaceDetector, 'stop')
+			const fakeFaceDetector = new FakePeriodicFaceDetector()
 
 			const comm = new Commentator({
+				faceApi: new FakeMicrosoftFaceApi(),
+				faceDetector: fakeFaceDetector,
 				init: 'idle',
 				presenceDetector: fakePresenceDetector,
-				faceDetector: fakePeriodicFaceDetector,
 				videoService: mockVideoService(),
 			})
 
-			comm.start()
-			expect(comm.state).toEqual(State.detectPresence)
-
-			fakePresenceDetector.isDetected = true
-			expect(comm.state).toEqual(State.detectFaces)
-
-			expect(fakePeriodicFaceDetector.stop).toHaveBeenCalledTimes(0)
 			fakePresenceDetector.isDetected = false
-			expect(comm.state).toEqual(State.detectPresence)
+			comm.start()
+			fakePresenceDetector.isDetected = true
 
-			throw new Error('TODO Implement full cycle')
+			const waitForDetectFaces: Promise<void> = comm.waitForState('detectFaces', 1000)
+			fakeFaceDetector.facesDetectedDispatcher.dispatch(singleFaceDetectedResult)
+
+			await waitForDetectFaces
+			fakePresenceDetector.isDetected = false
+
+			comm.stop()
+
+			expect(comm.history).toEqual(
+				['idle', 'detectPresence', 'detectFaces', 'identifyFaces', 'deliverComments', 'detectFaces', 'detectPresence', 'idle'])
 		} catch (err) {
-			console.error('Error received', err.stack)
-			throw err
+			console.error('Error received', err.stack || err)
+			fail(err)
+		} finally {
+			done()
 		}
 	})
 
-	// it('Stops detecting faces if presence is no longer detected', () => {
-	// 	fail('todo')
-	// })
+	it('Identifies any faces detected while identifying or commenting on previous faces when starting to detect faces', async (done) => {
+		try {
+			const fakePresenceDetector = new FakePresenceDetector()
+			const fakeFaceDetector = new FakePeriodicFaceDetector()
 
-	// it('Identifies detected faces while actively detecting faces', () => {
-	// 	fail('todo')
-	// })
+			const comm = new Commentator({
+				faceApi: new FakeMicrosoftFaceApi(),
+				faceDetector: fakeFaceDetector,
+				init: 'idle',
+				presenceDetector: fakePresenceDetector,
+				videoService: mockVideoService(),
+			})
 
-	// it('Identifies any faces detected while identifying or commenting on previous faces when starting to detect faces', () => {
-	// 	fail('todo')
-	// })
+			fakePresenceDetector.isDetected = true
+			comm.start()
+
+			comm.onTransition.subscribe((lifecycle) => {
+				switch (lifecycle.to) {
+					case 'identifyFaces': {
+						fakeFaceDetector.facesDetectedDispatcher.dispatch([face1, face2])
+						break
+					}
+					case 'deliverComments': {
+						fakeFaceDetector.facesDetectedDispatcher.dispatch([face3])
+						break
+					}
+				}
+			})
+
+			const waitForDetectFaces: Promise<void> = comm.waitForState('detectFaces', 1000)
+			fakeFaceDetector.facesDetectedDispatcher.dispatch(singleFaceDetectedResult)
+
+			await waitForDetectFaces
+			fakePresenceDetector.isDetected = false
+
+			comm.stop()
+
+			expect(comm.history).toEqual(
+				['idle', 'detectPresence', 'detectFaces', 'identifyFaces', 'deliverComments', 'detectFaces', 'detectPresence', 'idle'])
+		} catch (err) {
+			console.error('Error received', err.stack || err)
+			fail(err)
+		} finally {
+			fail('todo')
+			done()
+		}
+	})
 
 	// it('Delivers personal comments to identified persons', () => {
 	// 	fail('todo')

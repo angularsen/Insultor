@@ -34,6 +34,9 @@ function last(arr: any[]) {
 // tslint:disable:max-classes-per-file
 // tslint:disable-next-line:variable-name
 const StateMachine = require('javascript-state-machine')
+// tslint:disable:no-submodule-imports
+// tslint:disable-next-line:variable-name
+const StateMachineHistory = require('javascript-state-machine/lib/history')
 
 // tslint:disable-next-line:variable-name
 const Action = strEnum([
@@ -70,6 +73,7 @@ interface MyStateMachine {
 	facesIdentified: (input: FacesIdentifiedPayload) => void
 
 	// Props
+	history: State[]
 	state: State
 	onTransition: (lifecycle: Lifecycle, ...args: any[]) => void
 
@@ -99,7 +103,7 @@ interface FacesIdentifiedPayload {
 
 interface MyConfig {
 	init?: State | { state: State, event: Action, defer: boolean }
-	transitions?: MyTransition[]
+	plugins: any[]
 	// callbacks?: {
 	// 	[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
 	// }
@@ -115,6 +119,7 @@ interface MyConfig {
 		// 	onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
 		// 	onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
 	}
+	transitions?: MyTransition[]
 }
 
 interface MyTransition {
@@ -164,10 +169,9 @@ function withReentryToStateIfEmpty(transition: MyTransition): MyTransition {
 }
 
 export class Commentator {
-	public set onTransition(value: (lifecycle: Lifecycle, ...args: any[]) => void) {
-		this._fsm.observe('onTransition', value)
-	}
+	public get onTransition(): IEvent<Lifecycle> { return this._onTransitionDispacher }
 
+	private readonly _onTransitionDispacher = new EventDispatcher<Lifecycle>()
 	private readonly _faceDetector: IPeriodicFaceDetector
 	private readonly _commentProvider: ICommentProvider
 	private readonly _faceApi: IMicrosoftFaceApi
@@ -215,6 +219,9 @@ export class Commentator {
 					throw new Error(`Transition [${transition}] not allowed from [${from} => ${to}], a transition already pending.`)
 				},
 			},
+			plugins: [
+				new StateMachineHistory(),
+			],
 			transitions: [
 				{ from: '*', name              : 'stop', to              : 'idle' },
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
@@ -270,6 +277,7 @@ export class Commentator {
 	}
 
 	get state(): State { return this._fsm.state }
+	get history(): State[] { return this._fsm.history }
 
 	// Proxy methods for strongly typed args
 	public start = () => this._fsm.start()
@@ -279,6 +287,23 @@ export class Commentator {
 	public facesDetected(payload: FacesDetectedPayload) { this._fsm.facesDetected(payload) }
 	public facesIdentified(payload: FacesIdentifiedPayload) { this._fsm.facesIdentified(payload) }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
+
+	/**
+	 * Returns a promise that resolves when it enters the given state, however
+	 * it may have continued entering other states by the time the resolve
+	 * handler is invoked.
+	 */
+	public waitForState(state: State, timeoutMs?: number): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const timeoutHandle = setTimeout(() => reject(new Error('Timed out waiting for state: ' + state)), timeoutMs)
+			this._fsm.observe('onTransition', (lifeCycle, args) => {
+				if (lifeCycle.to === state) {
+					resolve()
+					clearTimeout(timeoutHandle)
+				}
+			})
+		})
+	}
 
 	// State handlers
 	private _onDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
@@ -300,6 +325,7 @@ export class Commentator {
 
 		console.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
 		const groupId = this._personGroupId
+
 		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
 			const personId = identifiedFace.candidates[0].personId
 			const cacheKey = `MS_FACEAPI_GET_PERSON:group[${groupId}]:person[${personId}]`
@@ -320,13 +346,15 @@ export class Commentator {
 		}))
 
 		// TODO Insert contextual comments here
-		const faceComments = unidentifiedFaces.map((x, i) => 'Face comment ' + i)
-		const personComments = identifiedPersons.map((x, i) => 'Person comment ' + i)
+		const faceComments = unidentifiedFaces.map((x, i) => `Comment #${i} on face [${x.faceId}]`)
+		const personComments = identifiedPersons.map((x, i) => `Comment #${i} on person [${x.personId}]`)
 		const comments = personComments.concat(faceComments)
 
 		for (const comment of comments) {
 			this._speech.speak(comment)
 		}
+
+		this.commentsDelivered()
 	}
 
 	private _onDetectFaces() {
@@ -352,6 +380,7 @@ export class Commentator {
 
 			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
+			console.debug(`Identified (or not) ${detectFacesResponse.length} faces.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
 			this.facesIdentified({
