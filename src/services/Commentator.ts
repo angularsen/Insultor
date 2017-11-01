@@ -279,6 +279,7 @@ export class Commentator {
 			onIdle: this._onIdle,
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
 				console.log(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
+				this._onTransitionDispacher.dispatch(lifecycle)
 			},
 		})
 	}
@@ -329,7 +330,7 @@ export class Commentator {
 			.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
 
 		const unidentifiedFaces = input.detectFacesResult
-			.filter(detectedFace => identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
+			.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
 
 		console.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
 

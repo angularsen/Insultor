@@ -233,19 +233,24 @@ describe('Commentator', () => {
 
 			let deliverCommentsCount = 0
 			comm.onTransition.subscribe((lifecycle) => {
-				switch (lifecycle.to) {
-					case 'identifyFaces': {
-						// Add two faces while identifying face1
-						fakeFaceDetector.facesDetectedDispatcher.dispatch([face2, face3])
-						break
+				// Can't transition while in a transition, so use setTimeout() to work around that
+				setTimeout(() => {
+					switch (lifecycle.to) {
+						case 'identifyFaces': {
+							// Add two faces while identifying face1
+							console.log('TEST: Dispatch faces detected: #2 and #3');
+							fakeFaceDetector.facesDetectedDispatcher.dispatch([face2, face3])
+							break
+						}
+						case 'deliverComments': {
+							// Add one face while commenting on face1
+							console.log('TEST: Dispatch faces detected: #4');
+							fakeFaceDetector.facesDetectedDispatcher.dispatch([face4])
+							deliverCommentsCount++
+							break
+						}
 					}
-					case 'deliverComments': {
-						// Add one face while commenting on face1
-						fakeFaceDetector.facesDetectedDispatcher.dispatch([face4])
-						deliverCommentsCount++
-						break
-					}
-				}
+				})
 			})
 
 			const waitForDetectFaces: Promise<void> = comm.waitForState('detectFaces', 1000)

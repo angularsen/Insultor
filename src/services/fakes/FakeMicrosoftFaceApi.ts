@@ -32,7 +32,7 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 			candidates: [
 				{
 					confidence: 0.8,
-					personId: 'fake person id for face ' + faceId,
+					personId: `fake person id for face [${faceId}]`,
 				},
 			],
 			faceId,
