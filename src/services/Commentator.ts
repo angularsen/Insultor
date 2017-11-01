@@ -368,21 +368,23 @@ export class Commentator {
 	}
 
 	private _onDetectFaces(lifecycle: Lifecycle) {
-		console.log('doDetectFaces')
-		if (lifecycle.from === 'idle') {
+		console.log('_onDetectFaces')
+		if (lifecycle.from === 'detectPresence') {
 			this._faceDetector.start()
 		}
 	}
 
-	private _onIdentifyFaces(lifecycle: Lifecycle, payload: FacesDetectedPayload) {
+	private _onIdentifyFaces(lifecycle: Lifecycle) {
+		// Create a copy then clear buffer
+		const detectFacesResult = this._facesDetectedBuffer.slice()
+		this._facesDetectedBuffer = []
+
 		// Do not await here to not block transition, will run in background
-		rstsrtsr
-		// TODO REMOVE PAYLOAD?
-		this._identifyFacesAsync({ detectFacesResult: this._facesDetectedBuffer })
+		this._identifyFacesAsync({ detectFacesResult })
 	}
 
 	private async _identifyFacesAsync(payload: FacesDetectedPayload): Promise<void> {
-		console.log('doIdentifyFacesAsync')
+		console.log('_onIdentifyFacesAsync')
 		try {
 			const detectFacesResponse = payload.detectFacesResult
 			if (!detectFacesResponse || detectFacesResponse.length === 0) {
@@ -407,7 +409,7 @@ export class Commentator {
 	}
 
 	private _onDetectPresence(lifecycle: Lifecycle) {
-		console.log('doDetectPresence')
+		console.log('_onDetectPresence')
 		if (lifecycle.from === 'idle') {
 			this._videoService.start()
 			this._presenceDetector.start()
@@ -418,7 +420,7 @@ export class Commentator {
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
-		console.log('doIdle')
+		console.log('_onIdle')
 		this._presenceDetector.stop()
 		this._videoService.stop()
 		this._faceDetector.stop()
