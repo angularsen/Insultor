@@ -20,14 +20,12 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	}
 
 	public async detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse> {
-		console.debug('FakeMicrosoftFaceApi: detectFacesAsync()')
 		const result = await this._detectFacesAsyncResult
 		console.debug('FakeMicrosoftFaceApi: detectFacesAsync() returns', result)
 		return result
 	}
 
 	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
-		console.debug('FakeMicrosoftFaceApi: identifyFacesAsync()')
 		const result: IdentifyFacesResponse = faceIds.map((faceId, i) => ({
 			candidates: [
 				{

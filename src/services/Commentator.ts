@@ -69,7 +69,7 @@ interface MyStateMachine {
 	stop: MyEventCaller
 	presenceDetected: MyEventCaller
 	noPresenceDetected: MyEventCaller
-	facesDetected: (input: FacesDetectedPayload) => void
+	facesDetected: () => void
 	facesIdentified: (input: FacesIdentifiedPayload) => void
 
 	// Props
@@ -78,6 +78,7 @@ interface MyStateMachine {
 	onTransition: (lifecycle: Lifecycle, ...args: any[]) => void
 
 	// Methods
+	can: (transition: Action) => boolean
 	observe: {
 		(event: string, callback: (lifecycle: Lifecycle, ...args: any[]) => void): void,
 		(events: object): void,
@@ -85,7 +86,7 @@ interface MyStateMachine {
 }
 
 interface FacesDetectedPayload {
-	detectFacesResult: DetectFacesResponse
+	detectFacesResult: DetectFaceResult[]
 }
 
 interface IdentifiedPerson {
@@ -292,10 +293,14 @@ export class Commentator {
 	public stop = () => this._fsm.stop()
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
+
 	public facesDetected(payload: FacesDetectedPayload) {
 		this._facesDetectedBuffer.push(...payload.detectFacesResult)
-		this._fsm.facesDetected(payload)
+		if (this._fsm.can('facesDetected')) {
+			this._fsm.facesDetected()
+		}
 	}
+
 	public facesIdentified(payload: FacesIdentifiedPayload) { this._fsm.facesIdentified(payload) }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
 
@@ -370,8 +375,21 @@ export class Commentator {
 
 	private _onDetectFaces(lifecycle: Lifecycle) {
 		console.log('_onDetectFaces')
-		if (lifecycle.from === 'detectPresence') {
-			this._faceDetector.start()
+
+		switch (lifecycle.from) {
+			case 'detectPresence': {
+				this._faceDetector.start()
+				break
+			}
+			default: {
+				if (this._facesDetectedBuffer.length > 0) {
+					console.log(`${this._facesDetectedBuffer.length} faces were detected in the meantime, identifying...`)
+
+					// Can't transition while in transition
+					setTimeout(() => this._fsm.facesDetected(), 0)
+				}
+				break
+			}
 		}
 	}
 
@@ -379,6 +397,7 @@ export class Commentator {
 		// Create a copy then clear buffer
 		const detectFacesResult = this._facesDetectedBuffer.slice()
 		this._facesDetectedBuffer = []
+		console.log('Cleared faces detecetd buffer.')
 
 		// Do not await here to not block transition, will run in background
 		this._identifyFacesAsync({ detectFacesResult })
@@ -397,7 +416,7 @@ export class Commentator {
 
 			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
-			console.debug(`Identified (or not) ${detectFacesResponse.length} faces.`)
+			console.debug(`Identifying ${detectFacesResponse.length} faces...Complete.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
 			this.facesIdentified({

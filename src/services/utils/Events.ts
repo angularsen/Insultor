@@ -18,6 +18,9 @@ export class EventDispatcher<TArgs> implements IEvent<TArgs> {
 		const i = this._subscriptions.indexOf(fn)
 		if (i > -1) {
 			this._subscriptions.splice(i, 1)
+			console.log('UNSUBSCRIBED!')
+		} else {
+			console.error('FAILED TO UNSUBSCRIBE!!!')
 		}
 	}
 

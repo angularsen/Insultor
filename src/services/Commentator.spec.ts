@@ -5,6 +5,7 @@ const jasmineReporters = require('jasmine-reporters')
 
 import {
 	Commentator,
+	Lifecycle,
 	State,
 } from './Commentator'
 
@@ -26,20 +27,20 @@ function delayAsync(ms: number): Promise<void> {
 }
 
 function waitForCondition(name: string, checkCondition: () => boolean, intervalMs: number, timeoutMs: number): Promise<void> {
-	let intervalHandle: number
+	let intervalHandle: NodeJS.Timer
 
 	return new Promise((resolve, reject) => {
 		const timeoutHandle = setTimeout(() => {
 			reject(new Error('Timed out: ' + name))
 			clearInterval(intervalHandle)
-		})
+		}, timeoutMs)
 
 		intervalHandle = setInterval(() => {
 			if (checkCondition()) {
 				resolve()
 				clearTimeout(timeoutHandle)
 			}
-		})
+		}, intervalMs)
 	})
 }
 
@@ -218,52 +219,56 @@ describe('Commentator', () => {
 				videoService: mockVideoService(),
 			})
 
-			comm.start()
-			fakePresenceDetector.isDetected = true
-
+			// Insert detected faces while in identiyFaces and deliverComments states
 			const getDetectFaceResult = (faceId: string): DetectFaceResult => {
 				// Intentionally only populate part of it
 				// tslint:disable-next-line:no-object-literal-type-assertion
 				return {
-					faceId: 'fake face 2',
+					faceId,
 				} as DetectFaceResult
 			}
 
-			const [face2, face3, face4] = [2, 3, 4].map(id => getDetectFaceResult('fake face id ' + id))
-
+			const [face1, face2, face3, face4] = [1, 2, 3, 4].map(id => getDetectFaceResult('fake face id ' + id))
 			let deliverCommentsCount = 0
-			comm.onTransition.subscribe((lifecycle) => {
-				// Can't transition while in a transition, so use setTimeout() to work around that
-				setTimeout(() => {
-					switch (lifecycle.to) {
-						case 'identifyFaces': {
-							// Add two faces while identifying face1
-							console.log('TEST: Dispatch faces detected: #2 and #3');
+			const handleOnTransition = (lifecycle: Lifecycle) => {
+				switch (lifecycle.from) {
+					case 'identifyFaces': {
+						if (deliverCommentsCount === 0) {
+							// Add face just after identifying face1, but only during first cycle to avoid infinite loop
+							console.log('TEST: Dispatch faces detected: #2 and #3')
 							fakeFaceDetector.facesDetectedDispatcher.dispatch([face2, face3])
-							break
 						}
-						case 'deliverComments': {
-							// Add one face while commenting on face1
-							console.log('TEST: Dispatch faces detected: #4');
-							fakeFaceDetector.facesDetectedDispatcher.dispatch([face4])
-							deliverCommentsCount++
-							break
-						}
+						break
 					}
-				})
-			})
+					case 'deliverComments': {
+						if (deliverCommentsCount === 0) {
+							// Add face just after commenting on face1, but only during first cycle to avoid infinite loop
+							console.log('TEST: Dispatch faces detected: #4')
+							fakeFaceDetector.facesDetectedDispatcher.dispatch([face4])
+						}
+						deliverCommentsCount++
+						break
+					}
+				}
+			}
+			comm.onTransition.subscribe(handleOnTransition)
+
+			comm.start()
+			fakePresenceDetector.isDetected = true
 
 			const waitForDetectFaces: Promise<void> = comm.waitForState('detectFaces', 1000)
 
 			// Raise face 1 detected
-			fakeFaceDetector.facesDetectedDispatcher.dispatch(singleFaceDetectedResult)
+			fakeFaceDetector.facesDetectedDispatcher.dispatch([face1])
 
-			await waitForCondition('deliverCommentsCount === 2', () => deliverCommentsCount === 2, 50, 1000)
+			await waitForCondition('deliverCommentsCount >== 2', () => deliverCommentsCount >= 2, 50, 1000)
 
 			// Two full cycles should occur due to additional faces detected while identifying/commenting
 			expect(comm.history).toEqual(
-				['idle', 'detectPresence', 'detectFaces', 'identifyFaces', 'deliverComments',
-				'detectFaces', 'identifyFaces', 'identifyFaces', 'deliverComments', 'detectFaces', 'identifyFaces'])
+				['idle', 'detectPresence',
+				'detectFaces', 'identifyFaces', 'deliverComments',
+				'detectFaces', 'identifyFaces', 'deliverComments',
+				'detectFaces'])
 		} catch (err) {
 			console.error('Error received', err.stack || err)
 			fail(err)

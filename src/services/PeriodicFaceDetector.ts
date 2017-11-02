@@ -94,7 +94,8 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 			return undefined
 		} finally {
 			console.debug(`PeriodicFaceDetector: Queue next detect faces in ${timeToWaitMs} ms.`)
-			return setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
 		}
+
+		return setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
 	}
 }
