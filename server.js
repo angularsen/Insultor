@@ -1,9 +1,17 @@
 const express = require('express');
 const webpackDevMiddleware = require('webpack-dev-middleware');
 const webpack = require('webpack');
-const webpackConfig = require('./webpack.config.js');
-const app = express();
 
+const isProduction = process.env.NODE_ENV === 'production'
+const webpackConfig = require(isProduction ? './webpack.dev.js' : './webpack.prod.js');
+
+if (isProduction) {
+  console.log('=========PRODUCTION=========')
+} else {
+  console.log('=========DEV=========')
+}
+
+const app = express();
 const compiler = webpack(webpackConfig);
 
 app.use(webpackDevMiddleware(compiler, {

@@ -36,7 +36,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	 * @see https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f30395236
 	 */
 	public detectFacesAsync(imageDataUrl: string) {
-		console.log('MsFaceApi: Detect face and analyze facial attributes with Microsoft Face API.')
+		console.log('MicrosoftFaceApi: Detect face and analyze facial attributes with Microsoft Face API.')
 
 		const method = 'POST'
 		const url = `${this.endpointDetectFace}?returnFaceId=true&returnFaceAttributes=${FACE_ATTRIBUTES}&returnFaceLandmarks=false`
@@ -64,14 +64,14 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			})
 			.then(detectedFaces => {
 				if (detectedFaces.length > 0) {
-					console.log(`MsFaceApi: No faces detected.`)
+					console.log(`MicrosoftFaceApi: No faces detected.`)
 				} else {
-					console.log(`MsFaceApi: Detected ${detectedFaces.length} faces.`, detectedFaces)
+					console.log(`MicrosoftFaceApi: Detected ${detectedFaces.length} faces.`, detectedFaces)
 				}
 				return detectedFaces
 			})
 			.catch(err => {
-				console.error('MsFaceApi: Failed to analyze face image.', err)
+				console.error('MicrosoftFaceApi: Failed to analyze face image.', err)
 				throw err
 			})
 	}
@@ -86,7 +86,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	public identifyFacesAsync(faceIds: AAGUID[], personGroupId: string = PERSONGROUPID_WEBSTEPTRONDHEIM) {
 		if (faceIds.length < 1) { throw new Error('Expected between 1 and 10 face IDs, got ' + faceIds.length) }
 
-		console.log(`MsFaceApi: Identify ${faceIds.length} faces with Microsoft Face API.`)
+		console.log(`MicrosoftFaceApi: Identify ${faceIds.length} faces with Microsoft Face API.`)
 
 		const method = 'POST'
 		const url = this.endpointIdentifyFace
@@ -118,21 +118,21 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			})
 			.then(identifiedFaces => {
 				if (identifiedFaces.length > 0) {
-					console.log(`MsFaceApi: No faces were identified.`)
+					console.log(`MicrosoftFaceApi: No faces were identified.`)
 				} else {
-					console.info(`MsFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
+					console.info(`MicrosoftFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
 				}
 				return identifiedFaces
 			})
 			.catch(err => {
-				console.error('MsFaceApi: Failed to identify faces.', err)
+				console.error('MicrosoftFaceApi: Failed to identify faces.', err)
 				throw err
 			})
 	}
 
 	public getPersonAsync(personGroupId: string, personId: AAGUID) {
 
-		console.log(`MsFaceApi: Get person ${personId}.`)
+		console.log(`MicrosoftFaceApi: Get person ${personId}.`)
 
 		const method = 'GET'
 		const url = `${this.endpoint}persongroups/${personGroupId}/persons/${personId}`
@@ -155,7 +155,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 						return res.json()
 					})
 					.catch(err => {
-						console.error('MsFaceApi: Failed to get person.', err)
+						console.error('MicrosoftFaceApi: Failed to get person.', err)
 						throw err
 					})
 

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import moment from 'moment';
 
 import Speech from './services/Speech';
-import FaceApi from './services/MsFaceApi';
+import FaceApi from './services/MicrosoftFaceApi';
 import FaceIdentityProvider from './services/FaceIdentityProvider';
 import PresenceDetector from './services/PresenceDetector';
 import { STATE_PRESENT, STATE_NOT_PRESENT } from './services/PresenceDetector';
