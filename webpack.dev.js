@@ -22,19 +22,4 @@ module.exports = {
         { test: /\.js$/, exclude: /node_modules/, loader: ['babel-loader', 'source-map-loader'], enforce: 'pre' }
     ]
   },
-  // module: {
-  //   loaders: [
-  //     {
-  //       test: /\.tsx?$/,
-  //       loader: 'awesome-typescript-loader'
-  //     }
-  //   ],
-  //   preLoaders: [
-  //     {
-  //       test: /\.js$/,
-  //       exclude: /node_modules/,
-  //       use: ['babel-loader', 'source-map-loader']
-  //     },
-  //   ],
-  // },
 };

@@ -1,8 +1,11 @@
-const path = require('path');
-const webpack = require('webpack');
+const path = require('path')
 const UglifyJSPlugin = require('uglifyjs-webpack-plugin')
+const webpack = require('webpack')
 
 module.exports = {
+  plugins: [
+    new UglifyJSPlugin()
+  ],
   context: path.join(__dirname, 'src'),
   devtool: 'source-map',
   entry: [
@@ -13,32 +16,15 @@ module.exports = {
     path: path.join(__dirname, 'www'),
     filename: 'bundle.js',
   },
-  module: {
-    loaders: [
-      {
-        test: /\.tsx?$/,
-        loader: 'awesome-typescript-loader'
-      }
-    ]
-  },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx']
   },
-  plugins: [
-  new UglifyJSPlugin({
-    output: { comments: false },
-    sourceMap: true
-  })
-  ],
   module: {
     rules: [
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader'
-        }
-      },
-    ],
+        // All files with a '.ts' or '.tsx' extension will be handled by 'awesome-typescript-loader'.
+        { test: /\.tsx?$/, exclude: /node_modules/, loader: "awesome-typescript-loader" },
+        // All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
+        { test: /\.js$/, exclude: /node_modules/, loader: ['babel-loader', 'source-map-loader'], enforce: 'pre' }
+    ]
   },
-};
+}
