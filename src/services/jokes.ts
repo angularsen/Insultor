@@ -1,6 +1,8 @@
+import * as FaceApiTypes from '../../docs/FaceAPI/DetectFacesResponse'
+
 export const jokes = {
 
-  moustache: moustache => [
+  moustache: (moustache: number) => [
     `Do you know the difference between a moustache and a gay moustache? The smell!`
   ],
 
@@ -13,21 +15,21 @@ export const jokes = {
   // hair: hair => TODO,
 
   // hairColor: { color: string, confidence: number }
-  hairColor: hairColor => [
+  hairColor: (hairColor: FaceApiTypes.HairColor[]) => [
     `Am I seeing some grey spots inside that lush, ${hairColor[0].color} noggin?`
   ],
 
 
   // anger: number
-  anger: anger => [`Whoa.. why so angry mister?`],
+  anger: (anger: number) => [`Whoa.. why so angry mister?`],
   // happiness: number
-  happiness: happiness => [`Happy, so happy! I'm so happy today!`],
+  happiness: (happiness: number) => [`Happy, so happy! I'm so happy today!`],
   // neutral: number
-  neutral: neutral => [`Lookin'.. neutral bro!`],
+  neutral: (neutral: number) => [`Lookin'.. neutral bro!`],
 
 
   // glasses: string
-  glasses: glasses => {
+  glasses: (glasses: FaceApiTypes.) => {
     switch (glasses) {
       case 'ReadingGlasses':
         return 'I was elected to LEAD, not to READ.';

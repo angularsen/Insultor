@@ -242,12 +242,14 @@ export interface Noise {
 	value: number
 }
 
+export type GlassType = 'ReadingGlasses' | 'Sunglasses' | 'SwimmingGoggles'
+
 export interface DetectFaceResult {
 	faceId: string
 	faceRectangle: FaceRectangle
 	faceLandmarks: FaceLandmarks
 	faceAttributes: FaceAttributes
-	glasses: string
+	glasses: GlassType
 	headPose: HeadPose
 	emotion: Emotion
 	hair: Hair
