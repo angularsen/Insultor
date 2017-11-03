@@ -3,7 +3,7 @@ const webpackDevMiddleware = require('webpack-dev-middleware');
 const webpack = require('webpack');
 
 const isProduction = process.env.NODE_ENV === 'production'
-const webpackConfig = require(isProduction ? './webpack.dev.js' : './webpack.prod.js');
+const webpackConfig = require(isProduction ? './webpack.prod.js' : './webpack.dev.js');
 
 if (isProduction) {
   console.log('=========PRODUCTION=========')

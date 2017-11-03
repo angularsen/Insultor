@@ -4,7 +4,9 @@ const webpack = require('webpack')
 
 module.exports = {
   plugins: [
-    new UglifyJSPlugin()
+    new UglifyJSPlugin({
+      sourceMap: false
+    })
   ],
   context: path.join(__dirname, 'src'),
   devtool: 'source-map',
