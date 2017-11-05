@@ -30,6 +30,30 @@ interface Size {
 
 const speech = new Speech()
 
+function getRenderDataForState(commentator: Commentator): RenderDataForState {
+	// Shades of steel blue, 100% is white and 0% is black
+	const color95 = '#edf3f8'
+	const color90 = '#dae7f1'
+	const color80 = '#b6cee2'
+	const color70 = '#91b6d4'
+	const color60 = '#6c9dc6'
+	const color50 = '#4785b8'
+	const color10 = '#0e1b25'
+	const lightTextColor = color95
+	const darkTextColor = color10
+
+	const stateText = commentator.status.text
+
+	switch (commentator.state) {
+		case 'idle': return { background: color95, color: darkTextColor, stateText }
+		case 'detectPresence': return { background: color80, color: darkTextColor, stateText }
+		case 'detectFaces': return { background: color70, color: darkTextColor, stateText }
+		case 'identifyFaces': return { background: color60, color: lightTextColor, stateText }
+		case 'deliverComments': return { background: color50, color: lightTextColor, stateText }
+		default: return { background: color10, color: lightTextColor, stateText }
+	}
+}
+
 const getTimePeriodOfDay = () => {
 	const now = moment()
 	if (now.hour() < 5) return 'night'
@@ -39,40 +63,24 @@ const getTimePeriodOfDay = () => {
 }
 
 interface State {
+	error?: string
 	isPresenceDetected: boolean
 	commentatorState: CommentatorState
+	commentatorStatus: string
+	commentatorEmoji: string
 	motionScore: number
+	/** Currently speaking this text, undefined otherwise. */
+	textToSpeak?: string
 	videoSize: Size
 }
 
 interface RenderDataForState {
 	background: string
-	foreground: string
+	color: string
 	stateText: string
 }
 
 class Component extends React.Component<any, State> {
-	private static _getRenderDataForState(commentatorState: CommentatorState): RenderDataForState {
-		// Shades of steel blue, 100% is white and 0% is black
-		const color95 = '#edf3f8'
-		const color90 = '#dae7f1'
-		const color80 = '#b6cee2'
-		const color70 = '#91b6d4'
-		const color60 = '#6c9dc6'
-		const color50 = '#4785b8'
-		const color10 = '#0e1b25'
-		const lightTextColor = color95
-		const darkTextColor = color10
-
-		switch (commentatorState) {
-			case 'idle': return { background: color95, foreground: darkTextColor, stateText: 'Sover...' }
-			case 'detectPresence': return { background: color80, foreground: darkTextColor, stateText: 'Jeg ser ingen' }
-			case 'detectFaces': return { background: color70, foreground: darkTextColor, stateText: 'Hm.. Er det noen her?' }
-			case 'identifyFaces': return { background: color60, foreground: lightTextColor, stateText: 'Hei, hvem er du?' }
-			case 'deliverComments': return { background: color50, foreground: lightTextColor, stateText: 'Hør her' }
-			default: return { background: color10, foreground: lightTextColor, stateText: 'Ingen i nærheten' }
-		}
-	}
 	private _commentator: Commentator
 
 	/**
@@ -98,15 +106,15 @@ class Component extends React.Component<any, State> {
 		// this.faceIdentityProvider = undefined
 
 		this.state = {
+			commentatorEmoji: '😶',
 			commentatorState: 'idle',
+			commentatorStatus: 'Ikke startet enda...',
 			isPresenceDetected: false,
 			motionScore: 0,
 			videoSize: { width: 640, height: 480 },
 		}
 
-		this._initVideo = this._initVideo.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
-		// this._initDiffCam = this._initDiffCam.bind(this)
 	}
 
 	public componentDidMount() {
@@ -120,11 +128,22 @@ class Component extends React.Component<any, State> {
 			presenceDetector: new PresenceDetector({ diffCanvas: motionDiffCanvas, video }),
 			videoService: new VideoService(video),
 		})
+
+		this._commentator.onStatusChanged.subscribe(status => {
+			this.setState({
+				commentatorEmoji: status.emoji,
+				commentatorStatus: status.text,
+			})
+		})
+
+		this._commentator.onSpeak.subscribe(speakData => {
+			this.setState({ textToSpeak: speakData.utterance.text })
+		})
 	}
 
 	public componentWillUnmount() {
 		console.log('Unmounting IdentifyOnPresence.')
-		// this.stopVideo()
+		this._commentator.stop()
 	}
 
 	public render() {
@@ -133,13 +152,14 @@ class Component extends React.Component<any, State> {
 
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
 		const buttonStyle = { padding: '1em', minWidth: '6em' }
-		const person = this.state.persons && this.state.persons[0]
-		let background: string = this._getBackgroundColor(this.state.commentatorState)
+		// const person = this.state.persons && this.state.persons[0]
+		const renderData = getRenderDataForState(this._commentator)
 
 		return (
-			<div>
-				<h1>Identify on presence</h1>
-				<h3>{person ? `Hi ${person.name}` : ''}</h3>
+			<div style={{ color: renderData.color, background: renderData.background }}>
+				<h1>Kommentator</h1>
+				<h3>{this.state.commentatorStatus}</h3>
+				<h3>{this.state.commentatorEmoji}</h3>
 				<h3>State: {this.state.isPresenceDetected}</h3>
 				<div className='camera'>
 					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
@@ -175,51 +195,17 @@ class Component extends React.Component<any, State> {
 		console.log('IdentifyOnPresence: Video ready to play. Calculating output height.')
 
 		// Scale height to achieve same aspect ratio for whatever our rendered width is
-		const height = video.videoHeight / (video.videoWidth / this.state.width)
-		this.setState({ height })
+		// const height = video.videoHeight / (video.videoWidth / this.state.width)
+		// this.setState({ height })
 	}
 
-	public _initVideo(video: HTMLVideoElement) {
-		// this.video = video
-		if (!video) return
-
-		this.setState({ width: video.width, height: video.height })
-		// this._initDiffCam()
-	}
-
-	// public _initDiffCam() {
-	// 	// This method is called for the ref callback of both video and motionDiffCanvas
-	// 	if (this._video && this._motionDiffCanvas) {
-	// 		console.log('IdentifyOnPresence: Initialize DiffCamEngine')
-
-	// 		DiffCamEngine.init({
-	// 			video: this.video,
-	// 			motionCanvas: this.motionDiffCanvas,
-	// 			captureIntervalTime: 200,
-	// 			captureCallback: this._onDiffCamFrame,
-	// 			initSuccessCallback: () => DiffCamEngine.start()
-	// 		})
-	// 	}
-	// }
-
-	public onPresenceStateChanged(state: boolean) {
-		this.setState({ detectionState: state })
+	public onPresenceStateChanged(isPresenceDetected: boolean) {
+		this.setState({ isPresenceDetected })
 	}
 
 	public _onMotionScore(motionScore: number) {
 		// this._presenceDetector.addMotionScore(frame.score)
 		this.setState({ motionScore })
-	}
-
-	public startVideo(video: any) {
-		// console.log('IdentifyOnPresence: Starting video...')
-		// _initVideo(this.video)
-	}
-
-	public stopVideo(video: any) {
-		// console.log('IdentifyOnPresence: Stopping video...')
-		// console.log('IdentifyOnPresence: Stopping video...OK.')
-		// DiffCamEngine.stop()
 	}
 
 	public _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {

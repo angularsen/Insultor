@@ -14,10 +14,15 @@ export interface ISpeechOpts {
 }
 
 export interface ISpeech {
-	speak(text: string, opts?: ISpeechOpts): void
+	speak(text: string, opts?: ISpeechOpts): SpeakData
 }
 
-export class Speech {
+export interface SpeakData {
+	utterance: SpeechSynthesisUtterance
+	completion: Promise<SpeechSynthesisEvent>
+}
+
+export class Speech implements ISpeech {
 	constructor() {
 		const canSpeak = 'speechSynthesis' in window
 		if (!canSpeak) {
@@ -25,11 +30,11 @@ export class Speech {
 		}
 	}
 
-	public speak(text: string, opts: ISpeechOpts) {
+	public speak(text: string, opts: ISpeechOpts): SpeakData {
 
-		return new Promise((resolve, reject) => {
-			const utter = new SpeechSynthesisUtterance()
+		const utter = new SpeechSynthesisUtterance()
 
+		const completion = new Promise<SpeechSynthesisEvent>((resolve, reject) => {
 			// Note: some voices don't support altering params
 			Object.assign(utter, defaultOpts, opts, { text })
 
@@ -38,13 +43,18 @@ export class Speech {
 				reject(ev.error)
 			}
 
-			utter.onend = (ev: Event) => {
+			utter.onend = (ev: SpeechSynthesisEvent) => {
 				console.info('Speech completed: ' + utter.text, utter)
 				resolve(ev)
 			}
 
 			window.speechSynthesis.speak(utter)
 		})
+
+		return {
+			completion,
+			utterance: utter,
+		}
 	}
 }
 
