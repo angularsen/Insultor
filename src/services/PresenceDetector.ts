@@ -63,9 +63,12 @@ interface Size {
 
 export class PresenceDetector implements IPresenceDetector {
 	public isDetected: boolean
+	public get onMotionScore(): IEvent<number> { return this._onMotionScoreDispatcher }
 	public get onIsDetectedChanged(): IEvent<boolean> { return this._onIsDetectedChangedDispatcher }
 
 	private readonly _onIsDetectedChangedDispatcher = new EventDispatcher<boolean>()
+	private readonly _onMotionScoreDispatcher = new EventDispatcher<number>()
+
 	private _diffContext: CanvasRenderingContext2D
 	// private _diffCanvas: HTMLCanvasElement
 	private _diffImageSize: Size
@@ -172,10 +175,13 @@ export class PresenceDetector implements IPresenceDetector {
 
 		// Get diff image
 		const diffImageData = diffContext.getImageData(0, 0, width, height)
+		const motionScore = this._processDiff(diffImageData)
 
 		// draw current capture normally over diff, ready for next time
 		diffContext.globalCompositeOperation = 'source-over'
 		diffContext.drawImage(video, 0, 0, width, height)
+
+		this._onMotionScoreDispatcher.dispatch(motionScore)
 	}
 
 	private _setIsDetected(state: boolean) {
@@ -185,7 +191,7 @@ export class PresenceDetector implements IPresenceDetector {
 		this._onIsDetectedChangedDispatcher.dispatch(state)
 	}
 
-	private processDiff(diffImageData: ImageData) {
+	private _processDiff(diffImageData: ImageData): number {
 		const rgba = diffImageData.data
 
 		// pixel adjustments are done by reference directly on diffImageData
@@ -201,10 +207,7 @@ export class PresenceDetector implements IPresenceDetector {
 				score++
 			}
 		}
-
-		return {
-			score,
-		}
+		return score
 	}
 }
 

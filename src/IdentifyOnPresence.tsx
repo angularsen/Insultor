@@ -123,9 +123,14 @@ class Component extends React.Component<any, State> {
 		const motionDiffCanvas = isDefined(this._motionDiffCanvas, '_motionDiffCanvas')
 		const faceDetectCanvas = isDefined(this._faceDetectCanvas, '_faceDetectCanvas')
 
+		const presenceDetector = new PresenceDetector({ diffCanvas: motionDiffCanvas, video })
+		presenceDetector.onMotionScore.subscribe(motionScore => {
+			this.setState({ motionScore })
+		})
+
 		this._commentator = new Commentator({
 			faceApi: new MicrosoftFaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId),
-			presenceDetector: new PresenceDetector({ diffCanvas: motionDiffCanvas, video }),
+			presenceDetector,
 			videoService: new VideoService(video),
 		})
 
@@ -162,6 +167,9 @@ class Component extends React.Component<any, State> {
 				<h3>{this.state.commentatorStatus}</h3>
 				<h3>{this.state.commentatorEmoji}</h3>
 				<h3>State: {this.state.isPresenceDetected}</h3>
+				<p>
+					Detection score: {this.state.motionScore}
+				</p>
 				<div>
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
 				</div>
@@ -179,9 +187,6 @@ class Component extends React.Component<any, State> {
 				</div>
 				<p>
 					{this.state.textToSpeak ? this.state.textToSpeak : ''}
-				</p>
-				<p>
-					Detection score: {this.state.motionScore}
 				</p>
 				<p>
 					{this.state.error ? 'Error happened: ' + this.state.error : ''}
