@@ -20,24 +20,33 @@ import { error } from './utils/format'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
 
-class Logger {
-	constructor(public name: string) { }
+// class Logger {
+// 	// public debug = Function.prototype.bind.call(console.debug, console)
+// 	public debug = (...args: any[]) => {
 
-	public debug(msg: string, ...optionalParams: any[]) {
-		console.debug(`${name}: ${msg}`, optionalParams)
-	}
-	public info(msg: string, ...optionalParams: any[]) {
-		console.info(`${name}: ${msg}`, optionalParams)
-	}
-	public warn(msg: string, ...optionalParams: any[]) {
-		console.warn(`${name}: ${msg}`, optionalParams)
-	}
-	public error(msg: string, ...optionalParams: any[]) {
-		console.error(`${name}: ${msg}`, optionalParams)
-	}
-}
+// 		return console.log.apply(this, args)
+// 	}
 
-const log = new Logger('Commentator')
+// 	constructor(public name: string) { }
+
+// 	public debug(...args: any[]): void {
+// 		console.log.apply(this, args)
+// 	}
+// 	// (msg: string, ...optionalParams: any[]) {
+// 	// 	console.debug(`${name}: ${msg}`, optionalParams)
+// 	// }
+// 	public info(msg: string, ...optionalParams: any[]) {
+// 		console.info(`${name}: ${msg}`, optionalParams)
+// 	}
+// 	public warn(msg: string, ...optionalParams: any[]) {
+// 		console.warn(`${name}: ${msg}`, optionalParams)
+// 	}
+// 	public error(msg: string, ...optionalParams: any[]) {
+// 		console.error(`${name}: ${msg}`, optionalParams)
+// 	}
+// }
+
+// const log = new Logger('Commentator')
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
@@ -305,7 +314,7 @@ export class Commentator {
 			try {
 			isPresenceDetected ? this.presenceDetected() : this.noPresenceDetected()
 			} catch (err) {
-				log.error('Failed to handle presence detected.', error(err))
+				console.error('Failed to handle presence detected.', error(err))
 			}
 		})
 
@@ -313,7 +322,7 @@ export class Commentator {
 			try {
 				this.facesDetected({ detectFacesResult: result })
 			} catch (err) {
-				log.error('Failed to handle detected faces.', error(err))
+				console.error('Failed to handle detected faces.', error(err))
 			}
 		})
 
@@ -325,7 +334,7 @@ export class Commentator {
 			onIdentifyFaces: this._onIdentifyFaces,
 			onIdle: this._onIdle,
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
-				log.info(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
+				console.info(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 				this._onTransitionDispacher.dispatch(lifecycle)
 			},
 		})
@@ -346,7 +355,7 @@ export class Commentator {
 		} else if (this._fsm.can('stop')) {
 			this.stop()
 		} else {
-			log.error(`Can\`t toggle start/stop in state ${this.state}. This is a bug, should always be possible to start/stop.`)
+			console.error(`Can\`t toggle start/stop in state ${this.state}. This is a bug, should always be possible to start/stop.`)
 		}
 	}
 
@@ -379,7 +388,8 @@ export class Commentator {
 
 	// State handlers
 	private _onDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
-		log.info('onDeliverComments')
+		console.info('onDeliverComments')
+		this._setStatus('Hør nå her', '😎')
 		// Do not await here to not block state transition
 		this._deliverCommentsAsync(input)
 	}
@@ -393,9 +403,9 @@ export class Commentator {
 		const unidentifiedFaces = input.detectFacesResult
 			.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
 
-		log.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
+		console.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
 
-		log.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
+		console.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
 
 		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
 			const personId = identifiedFace.candidates[0].personId
@@ -422,27 +432,31 @@ export class Commentator {
 		const comments = personComments.concat(faceComments)
 
 		for (const comment of comments) {
-			log.info(`Speaking comment ${comment}...`)
+			console.info(`Speaking comment ${comment}...`)
 			const speakData = this._speech.speak(comment)
 			this._onSpeakDispatcher.dispatch(speakData)
 			await speakData.completion
-			log.info(`Speaking comment ${comment}...DONE.`)
+			console.info(`Speaking comment ${comment}...DONE.`)
 		}
 
 		this.commentsDelivered()
 	}
 
 	private _onDetectFaces(lifecycle: Lifecycle) {
-		log.info('_onDetectFaces')
+		console.info('_onDetectFaces')
 
 		switch (lifecycle.from) {
 			case 'detectPresence': {
 				this._faceDetector.start()
+				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
 				break
+			}
+			case 'deliverComments': {
+				this._setStatus('Du er her fortsatt ja...', '😑')
 			}
 			default: {
 				if (this._facesDetectedBuffer.length > 0) {
-					log.info(`${this._facesDetectedBuffer.length} faces were detected in the meantime, identifying...`)
+					console.info(`${this._facesDetectedBuffer.length} faces were detected in the meantime, identifying...`)
 
 					// Can't transition while in transition
 					setTimeout(() => this._fsm.facesDetected(), 0)
@@ -456,26 +470,28 @@ export class Commentator {
 		// Create a copy then clear buffer
 		const detectFacesResult = this._facesDetectedBuffer.slice()
 		this._facesDetectedBuffer = []
-		log.info('Cleared faces detecetd buffer.')
+		console.info('Cleared faces detected buffer.')
+
+		this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
 
 		// Do not await here to not block transition, will run in background
 		this._identifyFacesAsync({ detectFacesResult })
 	}
 
 	private async _identifyFacesAsync(payload: FacesDetectedPayload): Promise<void> {
-		log.info('_onIdentifyFacesAsync')
+		console.info('_onIdentifyFacesAsync')
 		try {
 			const detectFacesResponse = payload.detectFacesResult
 			if (!detectFacesResponse || detectFacesResponse.length === 0) {
-				log.debug('payload', payload)
+				console.debug('payload', payload)
 				throw new Error('No detected faces were given.')
 			}
 
 			const faceIds = detectFacesResponse.map(x => x.faceId)
 
-			log.debug(`Identifying ${detectFacesResponse.length} faces...`)
+			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds)
-			log.debug(`Identifying ${detectFacesResponse.length} faces...Complete.`)
+			console.debug(`Identifying ${detectFacesResponse.length} faces...Complete.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
 			this.facesIdentified({
@@ -483,14 +499,14 @@ export class Commentator {
 				identifyFacesResult: identifyFacesResponse,
 			})
 		} catch (err) {
-			log.error('Failed to identify faces.', error(err))
+			console.error('Failed to identify faces.', error(err))
 		}
 	}
 
 	private _onDetectPresence(lifecycle: Lifecycle) {
-		log.info('_onDetectPresence')
+		console.info('_onDetectPresence')
 		if (lifecycle.from === 'idle') {
-			this._setStatus('Gjesp.. *smatt smatt*.. er det noen her?', '😑')
+			this._setStatus('Hei.. er det noen her?', '🙂')
 			this._videoService.start()
 			this._presenceDetector.start(200)
 			this._facesDetectedBuffer = [] // clear buffer
@@ -501,7 +517,7 @@ export class Commentator {
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
-		log.info('_onIdle')
+		console.info('_onIdle')
 
 		this._setStatus('Zzzz...', '😴')
 		this._presenceDetector.stop()
@@ -510,11 +526,11 @@ export class Commentator {
 	}
 
 	private async _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
-		log.debug(`On periodically detect faces...`)
+		console.debug(`On periodically detect faces...`)
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-		log.debug(`Got image data url, detecting faces...`, this._faceApi, this._faceApi.detectFacesAsync)
+		console.debug(`Got image data url, detecting faces...`, this._faceApi, this._faceApi.detectFacesAsync)
 		const result = await this._faceApi.detectFacesAsync(imageDataUrl)
-		log.debug(`detect faces result`, result)
+		console.debug(`detect faces result`, result)
 		return result
 	}
 

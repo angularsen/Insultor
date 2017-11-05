@@ -17,9 +17,13 @@ import { VideoService } from './services/VideoService'
 const STATE_FACE_DETECTED = 'face detected'
 const STATE_PERSON_IDENTIFIED = 'person identified'
 
+// Persons:
+// Andreas Gullberg Larsen 1e797137-fa4c-4d2b-86e8-6032b1007a04
+// 		face1 3651cd42-91f9-424f-84aa-e5e466a8f378 https://x4qqkg-sn3301.files.1drv.com/y4mrfl-hnbFB2TZfZBryCkMu9MdRAJN5Md7siS_iC96u-8L5mz1ow4aR6HZ48f3wN8QnV5QyP8oxybraZGMVS1t917hOJi3GXti_McLYZJUXU7SIX48klK9upfcui3R6CiGSkVloi3StSb10bdk1or5_24qPIOgKMP0sj0CyOG97wUjrljP3bEizMI5ha_hbfmEYOKFtUb1BjAK8rZQWY2oig/Andreas%20Gullberg%20Larsen%202017-05-30%20-%20profile%202%20square%20300p.jpg?psid=1
+
 const faceApiConfig = {
-	endpoint: 'https://westcentralus.api.cognitive.microsoft.com/face/v1.0/',
-	myPersonalSubscriptionKey: '93a68a5ab7d94ca0984fea54a332ad89',
+	endpoint: 'https://northeurope.api.cognitive.microsoft.com/face/v1.0/',
+	myPersonalSubscriptionKey: 'e3778e3dab7c46bba4b0af4dcd3df272',
 	webstepPersonGroupId: 'insultor-webstep-trd',
 }
 

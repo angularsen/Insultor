@@ -73,7 +73,6 @@ export class PresenceDetector implements IPresenceDetector {
 	// private _diffCanvas: HTMLCanvasElement
 	private _diffImageSize: Size
 	private _intervalTimer?: NodeJS.Timer
-	private _isDetected: boolean
 	private _motionStart?: Moment
 	// private _pixelDiffThreshold: number
 	private _lastMotionOn?: Moment
@@ -88,7 +87,7 @@ export class PresenceDetector implements IPresenceDetector {
 		}
 
 		this._opts = { ...{}, ...opts, ...defaultOpts }
-		this._isDetected = false
+		this.isDetected = false
 
 		// this._video = isDefined(this._opts.video, 'video')!
 		// this._diffCanvas = isDefined(this._opts.diffCanvas, 'motionCanvas')!
@@ -122,7 +121,7 @@ export class PresenceDetector implements IPresenceDetector {
 	}
 
 	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score
-	private addMotionScore(motionScore: number, receivedOnDate: Moment) {
+	private _onMotionScore(motionScore: number, receivedOnDate: Moment = moment()) {
 		const wasDetected = this.isDetected
 		const isDetectedJustNow = motionScore > this._opts.motionScoreThreshold
 
@@ -181,13 +180,14 @@ export class PresenceDetector implements IPresenceDetector {
 		diffContext.globalCompositeOperation = 'source-over'
 		diffContext.drawImage(video, 0, 0, width, height)
 
+		this._onMotionScore(motionScore)
 		this._onMotionScoreDispatcher.dispatch(motionScore)
 	}
 
 	private _setIsDetected(state: boolean) {
-		if (state === this._isDetected) { return }
+		if (state === this.isDetected) { return }
 
-		this._isDetected = state
+		this.isDetected = state
 		this._onIsDetectedChangedDispatcher.dispatch(state)
 	}
 
