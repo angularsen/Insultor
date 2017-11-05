@@ -8,7 +8,7 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 		private readonly _detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
 	}
 
-	public getPersonAsync(personGroupId: AAGUID, personId: AAGUID): Promise<Person> {
+	public getPersonAsync(personId: AAGUID): Promise<Person> {
 		const result: Person = {
 			name: 'Fake person name',
 			persistedFaceIds: ['face face ID'],
@@ -25,7 +25,7 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 		return result
 	}
 
-	public identifyFacesAsync(faceIds: string[], personGroupId: string): Promise<IdentifyFacesResponse> {
+	public identifyFacesAsync(faceIds: string[]): Promise<IdentifyFacesResponse> {
 		const result: IdentifyFacesResponse = faceIds.map((faceId, i) => ({
 			candidates: [
 				{

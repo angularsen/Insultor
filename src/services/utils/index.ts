@@ -11,7 +11,7 @@ export function strEnum<T extends string>(o: T[]): {[K in T]: K} {
  * @param myParam Parameter value
  * @param msg Failure message
  */
-export function isDefined<T>(myParam: T, msg: string): T {
+export function isDefined<T>(myParam: T | undefined, msg: string): T {
 	if (myParam === undefined) {
 		throw new Error(`Parameter ${myParam} was undefined: ${msg}`)
 	}

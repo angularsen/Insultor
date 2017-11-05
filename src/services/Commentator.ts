@@ -135,19 +135,6 @@ export interface Lifecycle {
 	to: State
 }
 
-export interface CommentatorOptions {
-	onTransition?: (lifecycle: Lifecycle, ...args: any[]) => void
-	init?: State
-	videoService?: IVideoService
-	faceDetector?: IPeriodicFaceDetector
-	detectFacesIntervalMs?: number
-	presenceDetector?: IPresenceDetector
-	speech?: ISpeech
-	faceApi?: IMicrosoftFaceApi
-	commentProvider?: ICommentProvider
-	personGroupId?: AAGUID
-}
-
 // To avoid filling out entire object for the sake of a test
 // tslint:disable-next-line:no-object-literal-type-assertion
 const fakeFace = {
@@ -169,15 +156,47 @@ function withReentryToStateIfEmpty(transition: MyTransition): MyTransition {
 	}
 }
 
+interface DefaultOpts {
+	commentProvider: ICommentProvider
+	detectFacesIntervalMs: number
+	init: State
+	speech: ISpeech
+}
+
+interface InputOpts {
+	// Required
+	faceApi: IMicrosoftFaceApi
+	presenceDetector: IPresenceDetector
+	videoService: IVideoService
+
+	// Optional
+	commentProvider?: ICommentProvider
+	detectFacesIntervalMs?: number
+	faceDetector?: IPeriodicFaceDetector
+	init?: State
+	speech?: ISpeech
+}
+
+interface CommentatorOptions {
+	commentProvider: ICommentProvider
+	detectFacesIntervalMs: number
+	faceApi: IMicrosoftFaceApi
+	faceDetector?: IPeriodicFaceDetector
+	init: State
+	presenceDetector: IPresenceDetector
+	speech: ISpeech
+	videoService: IVideoService
+}
+
 export class Commentator {
 	public get onTransition(): IEvent<Lifecycle> { return this._onTransitionDispacher }
+	public get stateText(): string { return this._stateText }
 
 	private readonly _onTransitionDispacher = new EventDispatcher<Lifecycle>()
 	private readonly _faceDetector: IPeriodicFaceDetector
 	private readonly _commentProvider: ICommentProvider
 	private readonly _faceApi: IMicrosoftFaceApi
 	private readonly _fsm: MyStateMachine
-	private readonly _personGroupId: AAGUID
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
@@ -188,19 +207,16 @@ export class Commentator {
 	 * on a previous faces, which can take several seconds.
 	 */
 	private _facesDetectedBuffer: DetectFaceResult[] = []
+	private _stateText: string = 'Sover...'
 
-	constructor({
-		commentProvider = new FakeCommentProvider(),
-		faceApi = new FakeMicrosoftFaceApi(),
-		init = 'idle',
-		// tslint:disable-next-line:no-unnecessary-initializer
-		faceDetector = undefined,
-		detectFacesIntervalMs = 4000,
-		presenceDetector = new FakePresenceDetector(),
-		speech = new FakeSpeech(),
-		videoService = new FakeVideoService(),
-		personGroupId,
-	}: CommentatorOptions = {}) {
+	constructor(inputOpts: InputOpts) {
+		const defaultOpts: DefaultOpts = {
+			commentProvider : new FakeCommentProvider(),
+			detectFacesIntervalMs : 4000,
+			init : 'idle',
+			speech : new FakeSpeech(),
+		}
+		const opts: CommentatorOptions = { ...{}, ...inputOpts, ...defaultOpts }
 
 		this._onDeliverComments = this._onDeliverComments.bind(this)
 		this._onDetectFaces = this._onDetectFaces.bind(this)
@@ -209,16 +225,15 @@ export class Commentator {
 		this._onIdle = this._onIdle.bind(this)
 		this._onPeriodicDetectFacesAsync = this._onPeriodicDetectFacesAsync.bind(this)
 
-		this._commentProvider = isDefined(commentProvider, 'commentProvider')
-		this._faceApi = isDefined(faceApi, 'faceApi')
-		this._presenceDetector = isDefined(presenceDetector, 'presenceDetector')
-		this._speech = isDefined(speech, 'speech')
-		this._videoService = isDefined(videoService, 'videoService')
-		this._personGroupId = personGroupId
-		this._faceDetector = faceDetector || new PeriodicFaceDetector(detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
+		this._commentProvider = opts.commentProvider
+		this._faceApi = opts.faceApi
+		this._presenceDetector = opts.presenceDetector
+		this._speech = opts.speech
+		this._videoService = opts.videoService
+		this._faceDetector = opts.faceDetector || new PeriodicFaceDetector(opts.detectFacesIntervalMs, this._onPeriodicDetectFacesAsync)
 
 		const config: MyConfig = {
-			init,
+			init: opts.init,
 			methods: {
 				onInvalidTransition(transition: string, from: State, to: State) {
 					throw new Error(`Transition [${transition}] not allowed from [${from}]`)
@@ -289,10 +304,20 @@ export class Commentator {
 	get history(): State[] { return this._fsm.history }
 
 	// Proxy methods for strongly typed args
-	public start = () => this._fsm.start()
-	public stop = () => this._fsm.stop()
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
+	public start = () => this._fsm.start()
+	public stop = () => this._fsm.stop()
+
+	public toggleStartStop() {
+		if (this._fsm.can('start')) {
+			this.start()
+		} else if (this._fsm.can('stop')) {
+			this.stop()
+		} else {
+			console.error(`Can\`t toggle start/stop in state ${this.state}. This is a bug, should always be possible to start/stop.`)
+		}
+	}
 
 	public facesDetected(payload: FacesDetectedPayload) {
 		this._facesDetectedBuffer.push(...payload.detectFacesResult)
@@ -340,12 +365,11 @@ export class Commentator {
 		console.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
 
 		console.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
-		const groupId = this._personGroupId
 
 		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
 			const personId = identifiedFace.candidates[0].personId
-			const cacheKey = `MS_FACEAPI_GET_PERSON:group[${groupId}]:person[${personId}]`
-			const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(groupId, personId))
+			const cacheKey = `MS_FACEAPI_GET_PERSON:person[${personId}]`
+			const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(personId))
 
 			return {
 				identifiedFace,
@@ -415,7 +439,7 @@ export class Commentator {
 			const faceIds = detectFacesResponse.map(x => x.faceId)
 
 			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
-			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds, this._personGroupId)
+			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds)
 			console.debug(`Identifying ${detectFacesResponse.length} faces...Complete.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
@@ -431,16 +455,19 @@ export class Commentator {
 	private _onDetectPresence(lifecycle: Lifecycle) {
 		console.log('_onDetectPresence')
 		if (lifecycle.from === 'idle') {
+			this._stateText = 'Gjesp.. *smatt smatt*.. er det noen her? 😑'
 			this._videoService.start()
 			this._presenceDetector.start()
 			this._facesDetectedBuffer = [] // clear buffer
 		} else {
+			this._stateText = 'Forlatt og alene igjen... 😟'
 			this._faceDetector.stop()
 		}
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
 		console.log('_onIdle')
+		this._stateText = 'Zzzz... 😴'
 		this._presenceDetector.stop()
 		this._videoService.stop()
 		this._faceDetector.stop()

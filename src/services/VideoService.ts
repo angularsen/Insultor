@@ -31,8 +31,8 @@ export class VideoService implements IVideoService {
 	private videoStream: MediaStream
 
 	constructor(
-		private _video: HTMLVideoElement = document.createElement('video'),
-		private _copyImageCanvas: HTMLCanvasElement = document.createElement('canvas')) {
+		private readonly _video: HTMLVideoElement = document.createElement('video'),
+		private readonly _copyImageCanvas: HTMLCanvasElement = document.createElement('canvas')) {
 		isDefined(_video, '_video')
 		isDefined(_copyImageCanvas, '_copyImageCanvas')
 

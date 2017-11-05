@@ -2,16 +2,12 @@ import { DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
 
-const PERSONGROUPID_WEBSTEPTRONDHEIM = 'insultor-webstep-trd'
-const SUBSCRIPTIONKEY_DEFAULT = '93a68a5ab7d94ca0984fea54a332ad89'
-const ENDPOINT_DEFAULT = 'https://westcentralus.api.cognitive.microsoft.com/face/v1.0/'
-
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 
 export interface IMicrosoftFaceApi {
 	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
-	getPersonAsync(personGroupId: string, personId: AAGUID): Promise<Person>
-	identifyFacesAsync(faceIds: AAGUID[], personGroupId: string): Promise<IdentifyFacesResponse>
+	getPersonAsync(personId: AAGUID): Promise<Person>
+	identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse>
 }
 
 export class MicrosoftFaceApi implements IMicrosoftFaceApi {
@@ -19,11 +15,12 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	private endpointDetectFace: string
 
 	constructor(
-		private subscriptionKey = SUBSCRIPTIONKEY_DEFAULT,
-		private endpoint = ENDPOINT_DEFAULT,
+		private readonly _subscriptionKey: string,
+		private readonly _endpoint: string,
+		private readonly _personGroupId: string,
 	) {
-		this.endpointDetectFace = endpoint + 'detect'
-		this.endpointIdentifyFace = endpoint + 'identify'
+		this.endpointDetectFace = _endpoint + 'detect'
+		this.endpointIdentifyFace = _endpoint + 'identify'
 	}
 
 	/**
@@ -42,7 +39,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const url = `${this.endpointDetectFace}?returnFaceId=true&returnFaceAttributes=${FACE_ATTRIBUTES}&returnFaceLandmarks=false`
 		const headers = new Headers()
 		headers.append('Content-Type', 'application/octet-stream')
-		headers.append('Ocp-Apim-Subscription-Key', this.subscriptionKey)
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
 		const body = this._createBlob(imageDataUrl)
 
@@ -83,7 +80,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	 * @returns Promise that on success returns the identified candidate person(s) for each query face. Otherwise returns the error.
 	 * @see https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f30395239
 	 */
-	public identifyFacesAsync(faceIds: AAGUID[], personGroupId: string = PERSONGROUPID_WEBSTEPTRONDHEIM) {
+	public identifyFacesAsync(faceIds: AAGUID[]) {
 		if (faceIds.length < 1) { throw new Error('Expected between 1 and 10 face IDs, got ' + faceIds.length) }
 
 		console.log(`MicrosoftFaceApi: Identify ${faceIds.length} faces with Microsoft Face API.`)
@@ -93,11 +90,11 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = new Headers()
 		headers.append('Accept', 'application/json')
 		headers.append('Content-Type', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this.subscriptionKey)
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
 		const body = JSON.stringify({
 			faceIds,
-			personGroupId,
+			personGroupId: this._personGroupId,
 			// maxNumOfCandidatesReturned = 1..5 (1),
 			// confidenceThreshold = 0..1 (default depends)
 		})
@@ -130,15 +127,15 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			})
 	}
 
-	public getPersonAsync(personGroupId: string, personId: AAGUID) {
+	public getPersonAsync(personId: AAGUID) {
 
 		console.log(`MicrosoftFaceApi: Get person ${personId}.`)
 
 		const method = 'GET'
-		const url = `${this.endpoint}persongroups/${personGroupId}/persons/${personId}`
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}`
 		const headers = new Headers()
 		headers.append('Accept', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this.subscriptionKey)
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
 		return fetch(url, { method, headers })
 					.then(async res => {
