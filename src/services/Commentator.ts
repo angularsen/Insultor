@@ -208,8 +208,9 @@ interface CommentatorOptions {
 }
 
 export interface StatusInfo {
-	text: string
 	emoji: string
+	state: State
+	text: string
 }
 
 export class Commentator {
@@ -235,7 +236,7 @@ export class Commentator {
 	 * on a previous faces, which can take several seconds.
 	 */
 	private _facesDetectedBuffer: DetectFaceResult[] = []
-	private _status: StatusInfo = { text: 'Ikke startet enda', emoji: '😶' }
+	private _status: StatusInfo = { state: 'idle', text: 'Ikke startet enda', emoji: '😶' }
 
 	constructor(inputOpts: InputOpts) {
 		const defaultOpts: DefaultOpts = {
@@ -246,12 +247,14 @@ export class Commentator {
 		}
 		const opts: CommentatorOptions = { ...{}, ...inputOpts, ...defaultOpts }
 
+		// Bind methods
 		this._onDeliverComments = this._onDeliverComments.bind(this)
 		this._onDetectFaces = this._onDetectFaces.bind(this)
 		this._onDetectPresence = this._onDetectPresence.bind(this)
 		this._onIdentifyFaces = this._onIdentifyFaces.bind(this)
 		this._onIdle = this._onIdle.bind(this)
 		this._onPeriodicDetectFacesAsync = this._onPeriodicDetectFacesAsync.bind(this)
+		this._setStatus = this._setStatus.bind(this)
 
 		this._commentProvider = opts.commentProvider
 		this._faceApi = opts.faceApi
@@ -487,19 +490,20 @@ export class Commentator {
 	private _onDetectPresence(lifecycle: Lifecycle) {
 		log.info('_onDetectPresence')
 		if (lifecycle.from === 'idle') {
-			this._status = { text: 'Gjesp.. *smatt smatt*.. er det noen her?', emoji: '😑' }
+			this._setStatus('Gjesp.. *smatt smatt*.. er det noen her?', '😑')
 			this._videoService.start()
-			this._presenceDetector.start()
+			this._presenceDetector.start(200)
 			this._facesDetectedBuffer = [] // clear buffer
 		} else {
-			this._status = { text: 'Forlatt og alene igjen...', emoji: '😟' }
+			this._setStatus('Forlatt og alene igjen...', '😟')
 			this._faceDetector.stop()
 		}
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
 		log.info('_onIdle')
-		this._status = { text: 'Zzzz...', emoji: '😴' }
+
+		this._setStatus('Zzzz...', '😴')
 		this._presenceDetector.stop()
 		this._videoService.stop()
 		this._faceDetector.stop()
@@ -515,7 +519,7 @@ export class Commentator {
 	}
 
 	private _setStatus(text: string, emoji: string) {
-		this._status = { text, emoji }
+		this._status = { state: this.state, text, emoji }
 		this._onStatusChangedDispatcher.dispatch(this._status)
 	}
 }

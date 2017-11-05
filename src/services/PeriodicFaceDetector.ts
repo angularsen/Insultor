@@ -41,7 +41,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 	}
 
 	public start(): void {
-		if (this._isRunning) { throw new Error('Already running.') }
+		if (this._isRunning) { return }
 		this._isRunning = true
 
 		const intervalMs = this._intervalMs
@@ -50,7 +50,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 	}
 
 	public stop(): void {
-		if (!this._isRunning) { throw new Error('Already stopped.') }
+		if (!this._isRunning) { return }
 		this._isRunning = false
 
 		console.info(`PeriodicFaceDetector: Stopping.`)

@@ -92,6 +92,9 @@ export class PresenceDetector implements IPresenceDetector {
 		this._diffContext = isDefined(this._opts.diffCanvas.getContext('2d'), 'diffContext')!
 		this._diffImageSize = { width: this._opts.diffWidth || 64, height: this._opts.diffHeight || 64 }
 		// this._pixelDiffThreshold = isDefined(this._opts.pixelDiffThreshold, 'pixelDiffThreshold')!
+
+		this._checkPresenceInImage = this._checkPresenceInImage.bind(this)
+		this._setIsDetected = this._setIsDetected.bind(this)
 	}
 
 	public start(pollIntervalMs: number = 100): void {
@@ -101,7 +104,7 @@ export class PresenceDetector implements IPresenceDetector {
 		}
 
 		console.info('Start polling presence.')
-		this._intervalTimer = setInterval(this.checkPresenceInImage, pollIntervalMs)
+		this._intervalTimer = setInterval(this._checkPresenceInImage, pollIntervalMs)
 	}
 
 	public stop(): void {
@@ -158,7 +161,7 @@ export class PresenceDetector implements IPresenceDetector {
 		}
 	}
 
-	private checkPresenceInImage() {
+	private _checkPresenceInImage() {
 		const diffContext = this._diffContext
 		const video = this._opts.video
 		const {width, height} = this._diffImageSize

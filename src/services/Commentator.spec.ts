@@ -12,6 +12,7 @@ import {
 import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
 import { FakePeriodicFaceDetector } from './fakes/FakePeriodicFaceDetector'
 import { FakePresenceDetector } from './fakes/FakePresenceDetector'
+import { FakeVideoService } from './fakes/FakeVideoService'
 import { IPeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
 import { IVideoService } from './VideoService'
@@ -58,6 +59,11 @@ const getMocks = () => ({
 
 const fakeFaceId = 'fake face ID'
 const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
+const fakeOpts = () => ({
+	faceApi: new FakeMicrosoftFaceApi(),
+	presenceDetector: new FakePresenceDetector(),
+	videoService: new FakeVideoService(),
+})
 
 describe('Commentator', () => {
 	beforeEach((done) => {
@@ -69,7 +75,7 @@ describe('Commentator', () => {
 	})
 
 	it('Defaults to Idle state.', () => {
-			expect(new Commentator({}).state).toBe(State.idle)
+			expect(new Commentator(fakeOpts()).state).toBe(State.idle)
 	})
 
 	it('Start while idle starts streaming video and detecting presence', () => {
@@ -77,6 +83,7 @@ describe('Commentator', () => {
 		const fakePresenceDetector = new FakePresenceDetector()
 		spyOn(fakePresenceDetector, 'start')
 		const sm = new Commentator({
+			...fakeOpts(),
 			init: 'idle',
 			presenceDetector: fakePresenceDetector,
 			videoService: videoServiceMock,
@@ -91,13 +98,12 @@ describe('Commentator', () => {
 
 		const { presenceDetectorMock, videoServiceMock } = getMocks()
 		const startStates: State[] = ['detectFaces', 'detectPresence', 'identifyFaces', 'deliverComments']
-		const fakePresenceDetector = new FakePresenceDetector()
 
 		for (const startState of startStates) {
 			console.log('With start state: ' + startState)
 			const sm = new Commentator({
+				...fakeOpts(),
 				init: startState,
-				presenceDetector: fakePresenceDetector,
 			})
 
 			let gotTransition = false
@@ -115,16 +121,12 @@ describe('Commentator', () => {
 	it('Starts periodic face detector on presence detected', () => {
 		try {
 			const fakePresenceDetector = new FakePresenceDetector()
-
-			// const fakeFaceApi = new FakeMicrosoftFaceApi(Promise.resolve(singleFaceDetectedResult))
-
 			const fakePeriodicFaceDetector = new FakePeriodicFaceDetector()
 			spyOn(fakePeriodicFaceDetector, 'start')
 
 			const comm = new Commentator({
-				// faceApi: fakeFaceApi,
+				...fakeOpts(),
 				faceDetector: fakePeriodicFaceDetector,
-				init: 'idle',
 				presenceDetector: fakePresenceDetector,
 				videoService: mockVideoService(),
 			})
@@ -153,6 +155,7 @@ describe('Commentator', () => {
 			spyOn(fakePeriodicFaceDetector, 'stop')
 
 			const comm = new Commentator({
+				...fakeOpts(),
 				faceDetector: fakePeriodicFaceDetector,
 				init: 'detectFaces',
 				presenceDetector: fakePresenceDetector,

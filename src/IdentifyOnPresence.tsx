@@ -30,7 +30,7 @@ interface Size {
 
 const speech = new Speech()
 
-function getRenderDataForState(commentator: Commentator): RenderDataForState {
+function getStateStyle(commentator: Commentator): StateStyle {
 	// Shades of steel blue, 100% is white and 0% is black
 	const color95 = '#edf3f8'
 	const color90 = '#dae7f1'
@@ -42,15 +42,13 @@ function getRenderDataForState(commentator: Commentator): RenderDataForState {
 	const lightTextColor = color95
 	const darkTextColor = color10
 
-	const stateText = commentator.status.text
-
 	switch (commentator.state) {
-		case 'idle': return { background: color95, color: darkTextColor, stateText }
-		case 'detectPresence': return { background: color80, color: darkTextColor, stateText }
-		case 'detectFaces': return { background: color70, color: darkTextColor, stateText }
-		case 'identifyFaces': return { background: color60, color: lightTextColor, stateText }
-		case 'deliverComments': return { background: color50, color: lightTextColor, stateText }
-		default: return { background: color10, color: lightTextColor, stateText }
+		case 'idle': return { background: color95, color: darkTextColor }
+		case 'detectPresence': return { background: color80, color: darkTextColor }
+		case 'detectFaces': return { background: color70, color: darkTextColor }
+		case 'identifyFaces': return { background: color60, color: lightTextColor }
+		case 'deliverComments': return { background: color50, color: lightTextColor }
+		default: return { background: color10, color: lightTextColor }
 	}
 }
 
@@ -74,10 +72,9 @@ interface State {
 	videoSize: Size
 }
 
-interface RenderDataForState {
+interface StateStyle {
 	background: string
 	color: string
-	stateText: string
 }
 
 class Component extends React.Component<any, State> {
@@ -115,6 +112,9 @@ class Component extends React.Component<any, State> {
 		}
 
 		this._onMotionScore = this._onMotionScore.bind(this)
+		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
+		this._onMotionScore = this._onMotionScore.bind(this)
+		this._startStopOnClick = this._startStopOnClick.bind(this)
 	}
 
 	public componentDidMount() {
@@ -132,6 +132,7 @@ class Component extends React.Component<any, State> {
 		this._commentator.onStatusChanged.subscribe(status => {
 			this.setState({
 				commentatorEmoji: status.emoji,
+				commentatorState: status.state,
 				commentatorStatus: status.text,
 			})
 		})
@@ -153,14 +154,17 @@ class Component extends React.Component<any, State> {
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
 		const buttonStyle = { padding: '1em', minWidth: '6em' }
 		// const person = this.state.persons && this.state.persons[0]
-		const renderData = getRenderDataForState(this._commentator)
+		const stateStyle: StateStyle = this._commentator ? getStateStyle(this._commentator) : { color: 'back', background: 'white' }
 
 		return (
-			<div style={{ color: renderData.color, background: renderData.background }}>
+			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
 				<h1>Kommentator</h1>
 				<h3>{this.state.commentatorStatus}</h3>
 				<h3>{this.state.commentatorEmoji}</h3>
 				<h3>State: {this.state.isPresenceDetected}</h3>
+				<div>
+					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
+				</div>
 				<div className='camera'>
 					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
 					width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
@@ -172,9 +176,6 @@ class Component extends React.Component<any, State> {
 				<div>
 					<canvas style={{ border: '1px solid lightgrey' }} id='faceapi-canvas' ref={(canvas) => this._faceDetectCanvas = canvas || undefined}
 						width={width} height={height}></canvas>
-				</div>
-				<div>
-					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
 				</div>
 				<p>
 					{this.state.textToSpeak ? this.state.textToSpeak : ''}
@@ -189,7 +190,7 @@ class Component extends React.Component<any, State> {
 		)
 	}
 
-	public videoOnCanPlay(ev: React.SyntheticEvent<HTMLVideoElement>) {
+	private videoOnCanPlay(ev: React.SyntheticEvent<HTMLVideoElement>) {
 		const video: HTMLVideoElement = ev.target as HTMLVideoElement
 
 		console.log('IdentifyOnPresence: Video ready to play. Calculating output height.')
@@ -199,16 +200,16 @@ class Component extends React.Component<any, State> {
 		// this.setState({ height })
 	}
 
-	public onPresenceStateChanged(isPresenceDetected: boolean) {
+	private _onPresenceStateChanged(isPresenceDetected: boolean) {
 		this.setState({ isPresenceDetected })
 	}
 
-	public _onMotionScore(motionScore: number) {
+	private _onMotionScore(motionScore: number) {
 		// this._presenceDetector.addMotionScore(frame.score)
 		this.setState({ motionScore })
 	}
 
-	public _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
+	private _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
 		ev.preventDefault()
 		this._commentator.toggleStartStop()
 	}
