@@ -445,6 +445,12 @@ export class Commentator {
 	private _onDetectFaces(lifecycle: Lifecycle) {
 		console.info('_onDetectFaces')
 
+		if (!this._presenceDetector.isDetected) {
+			console.info('User is no longer present, proceeding to not present state.')
+			// Can't transition while in transition
+			setTimeout(() => this.noPresenceDetected(), 0)
+		}
+
 		switch (lifecycle.from) {
 			case 'detectPresence': {
 				this._faceDetector.start()

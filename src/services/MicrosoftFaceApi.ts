@@ -4,6 +4,19 @@ import { Person } from '../../docs/FaceAPI/Person'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 
+async function ensureSuccessAsync(res: Response) {
+	if (!res.ok) {
+		switch (res.status) {
+			case 429: {
+				throw new HttpError('Rate limit exceeded.', res, await res.json())
+			}
+			default: {
+				throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, await res.json())
+			}
+		}
+	}
+}
+
 export interface IMicrosoftFaceApi {
 	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
 	getPersonAsync(personId: AAGUID): Promise<Person>
@@ -12,7 +25,8 @@ export interface IMicrosoftFaceApi {
 
 export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	private endpointIdentifyFace: string
-	private endpointDetectFace: string
+	private endpointDetectFace: string	trainPersonGroup: any;
+
 
 	constructor(
 		private readonly _subscriptionKey: string,
@@ -61,9 +75,9 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			})
 			.then(detectedFaces => {
 				if (detectedFaces.length > 0) {
-					console.log(`MicrosoftFaceApi: No faces detected.`)
-				} else {
 					console.log(`MicrosoftFaceApi: Detected ${detectedFaces.length} faces.`, detectedFaces)
+				} else {
+					console.log(`MicrosoftFaceApi: No faces detected.`)
 				}
 				return detectedFaces
 			})
@@ -139,23 +153,47 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		return fetch(url, { method, headers })
 					.then(async res => {
-						if (!res.ok) {
-							switch (res.status) {
-								case 429: {
-									throw new HttpError('Rate limit exceeded.', res, await res.json())
-								}
-								default: {
-									throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, await res.json())
-								}
-							}
-						}
+						await ensureSuccessAsync(res)
 						return res.json()
 					})
 					.catch(err => {
 						console.error('MicrosoftFaceApi: Failed to get person.', err)
 						throw err
 					})
+	}
 
+	public trainPersonGroup() {
+		const method = 'POST'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/train`
+		const headers = new Headers()
+		headers.append('Accept', 'application/json')
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+
+		return fetch(url, { method, headers})
+		.then(async res => {
+			await ensureSuccessAsync(res)
+			return res.json()
+		}).catch(err => {
+			console.error('MicrosoftFaceApi: Failed to get person.', err)
+			throw err
+		})
+	}
+
+	public getPersonGroupTrainingStatus(): Promise<> {
+		const method = 'GET'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/training`
+		const headers = new Headers()
+		headers.append('Accept', 'application/json')
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+
+		return fetch(url, { method, headers})
+		.then(async res => {
+			await ensureSuccessAsync(res)
+			return res.json()
+		}).catch(err => {
+			console.error('MicrosoftFaceApi: Failed to get person.', err)
+			throw err
+		})
 	}
 
 	// Convert a data URL to a file blob for POST request

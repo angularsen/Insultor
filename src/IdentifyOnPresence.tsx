@@ -82,6 +82,7 @@ interface StateStyle {
 }
 
 class Component extends React.Component<any, State> {
+	private _faceApi: MicrosoftFaceApi
 	private _commentator: Commentator
 
 	/**
@@ -115,6 +116,11 @@ class Component extends React.Component<any, State> {
 			videoSize: { width: 640, height: 480 },
 		}
 
+		this._faceApi = new MicrosoftFaceApi(
+			faceApiConfig.myPersonalSubscriptionKey,
+			faceApiConfig.endpoint,
+			faceApiConfig.webstepPersonGroupId)
+
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
@@ -133,9 +139,9 @@ class Component extends React.Component<any, State> {
 		})
 
 		this._commentator = new Commentator({
-			faceApi: new MicrosoftFaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId),
+			faceApi: this._faceApi,
 			presenceDetector,
-			videoService: new VideoService(video),
+			videoService: new VideoService(video, faceDetectCanvas),
 		})
 
 		this._commentator.onStatusChanged.subscribe(status => {
@@ -176,6 +182,7 @@ class Component extends React.Component<any, State> {
 				</p>
 				<div>
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
+					<button style={buttonStyle} onClick={this._trainPersonGroup}>Train person group</button>
 				</div>
 				<div className='camera'>
 					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
@@ -219,8 +226,13 @@ class Component extends React.Component<any, State> {
 	}
 
 	private _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
-		ev.preventDefault()
 		this._commentator.toggleStartStop()
+	}
+
+	private async _trainPersonGroup(ev: Event) {
+		console.info('Training person group...')
+		await this._faceApi.trainPersonGroup()
+		console.info('Training person group...DONE. Results may still take some time.')
 	}
 }
 
