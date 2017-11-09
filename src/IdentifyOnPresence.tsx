@@ -7,19 +7,20 @@ type Moment = moment.Moment
 // import FaceIdentityProvider from './services/FaceIdentityProvider'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 
+import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
 import { default as Commentator, State as CommentatorState } from './services/Commentator'
 // import DiffCamEngine from './services/diff-cam-engine'
 import { default as PresenceDetector } from './services/PresenceDetector'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
-import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus';
 
 const STATE_FACE_DETECTED = 'face detected'
 const STATE_PERSON_IDENTIFIED = 'person identified'
 
 // Persons:
 // Andreas Gullberg Larsen 1e797137-fa4c-4d2b-86e8-6032b1007a04
+// tslint:disable-next-line:max-line-length
 // 		face1 3651cd42-91f9-424f-84aa-e5e466a8f378 https://x4qqkg-sn3301.files.1drv.com/y4mrfl-hnbFB2TZfZBryCkMu9MdRAJN5Md7siS_iC96u-8L5mz1ow4aR6HZ48f3wN8QnV5QyP8oxybraZGMVS1t917hOJi3GXti_McLYZJUXU7SIX48klK9upfcui3R6CiGSkVloi3StSb10bdk1or5_24qPIOgKMP0sj0CyOG97wUjrljP3bEizMI5ha_hbfmEYOKFtUb1BjAK8rZQWY2oig/Andreas%20Gullberg%20Larsen%202017-05-30%20-%20profile%202%20square%20300p.jpg?psid=1
 
 const faceApiConfig = {
@@ -76,7 +77,7 @@ interface State {
 	textToSpeak?: string
 	videoSize: Size
 	/** Last polled training status */
-	trainingStatus: PersonGroupTrainingStatus
+	trainingStatus?: PersonGroupTrainingStatus
 }
 
 interface StateStyle {
@@ -116,6 +117,7 @@ class Component extends React.Component<any, State> {
 			commentatorStatus: 'Ikke startet enda...',
 			isPresenceDetected: false,
 			motionScore: 0,
+			trainingStatus: undefined,
 			videoSize: { width: 640, height: 480 },
 		}
 
@@ -128,6 +130,8 @@ class Component extends React.Component<any, State> {
 		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._startStopOnClick = this._startStopOnClick.bind(this)
+		this._trainPersonGroupAsync = this._trainPersonGroupAsync.bind(this)
+		this._updatePersonGroupTrainingStatusAsync = this._updatePersonGroupTrainingStatusAsync.bind(this)
 	}
 
 	public componentDidMount() {
@@ -166,7 +170,7 @@ class Component extends React.Component<any, State> {
 	}
 
 	public render() {
-		const { videoSize } = this.state
+		const { trainingStatus, videoSize } = this.state
 		const { width, height } = videoSize
 
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
@@ -174,10 +178,10 @@ class Component extends React.Component<any, State> {
 		// const person = this.state.persons && this.state.persons[0]
 		const stateStyle: StateStyle = this._commentator ? getStateStyle(this._commentator) : { color: 'back', background: 'white' }
 
-		const trainingStatusDiv = this.state.trainingStatus ? (
-		<p>
-			{this.state.trainingStatus.status} {this.state.trainingStatus.lastActionDateTime} { this.state.trainingStatus.message}
-		</p>) : undefined
+		const trainingStatusDiv = trainingStatus ? (
+			<p>
+				{trainingStatus.status} {trainingStatus.lastActionDateTime} {trainingStatus.message}
+			</p>) : undefined
 
 		return (
 			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
@@ -191,7 +195,8 @@ class Component extends React.Component<any, State> {
 				{trainingStatusDiv}
 				<div>
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
-					<button style={buttonStyle} onClick={this._trainPersonGroup}>Train person group</button>
+					<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
+					<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
 				</div>
 				<div className='camera'>
 					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
@@ -238,12 +243,18 @@ class Component extends React.Component<any, State> {
 		this._commentator.toggleStartStop()
 	}
 
-	private async _trainPersonGroup(ev: Event) {
+	private async _trainPersonGroupAsync(ev: React.MouseEvent<HTMLButtonElement>) {
 		console.info('Training person group...')
 		await this._faceApi.trainPersonGroup()
-		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
-		this.setState({trainingStatus})
 		console.info('Training person group...DONE. Results may still take some time.')
+		await this._updatePersonGroupTrainingStatusAsync()
+	}
+
+	private async _updatePersonGroupTrainingStatusAsync() {
+		console.info('Query person group training status...')
+		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
+		console.info('Query person group training status...DONE.', trainingStatus)
+		this.setState({trainingStatus})
 	}
 }
 

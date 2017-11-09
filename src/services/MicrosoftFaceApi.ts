@@ -1,7 +1,7 @@
 import { DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
-import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus';
+import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 
@@ -9,10 +9,10 @@ async function ensureSuccessAsync(res: Response) {
 	if (!res.ok) {
 		switch (res.status) {
 			case 429: {
-				throw new HttpError('Rate limit exceeded.', res, await res.json())
+				throw new HttpError('Rate limit exceeded.', res, (res && await res.json()))
 			}
 			default: {
-				throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, await res.json())
+				throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, (res && await res.json()))
 			}
 		}
 	}
@@ -162,7 +162,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 					})
 	}
 
-	public trainPersonGroup() {
+	public trainPersonGroup(): Promise<void> {
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/train`
 		const headers = new Headers()
@@ -172,7 +172,6 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		return fetch(url, { method, headers})
 		.then(async res => {
 			await ensureSuccessAsync(res)
-			return res.json()
 		}).catch(err => {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
