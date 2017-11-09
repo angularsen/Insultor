@@ -1,6 +1,7 @@
 import { DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
+import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus';
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 
@@ -25,8 +26,7 @@ export interface IMicrosoftFaceApi {
 
 export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	private endpointIdentifyFace: string
-	private endpointDetectFace: string	trainPersonGroup: any;
-
+	private endpointDetectFace: string
 
 	constructor(
 		private readonly _subscriptionKey: string,
@@ -179,7 +179,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		})
 	}
 
-	public getPersonGroupTrainingStatus(): Promise<> {
+	public getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/training`
 		const headers = new Headers()

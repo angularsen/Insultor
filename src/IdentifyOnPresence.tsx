@@ -13,6 +13,7 @@ import { default as PresenceDetector } from './services/PresenceDetector'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
+import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus';
 
 const STATE_FACE_DETECTED = 'face detected'
 const STATE_PERSON_IDENTIFIED = 'person identified'
@@ -74,6 +75,8 @@ interface State {
 	/** Currently speaking this text, undefined otherwise. */
 	textToSpeak?: string
 	videoSize: Size
+	/** Last polled training status */
+	trainingStatus: PersonGroupTrainingStatus
 }
 
 interface StateStyle {
@@ -171,6 +174,11 @@ class Component extends React.Component<any, State> {
 		// const person = this.state.persons && this.state.persons[0]
 		const stateStyle: StateStyle = this._commentator ? getStateStyle(this._commentator) : { color: 'back', background: 'white' }
 
+		const trainingStatusDiv = this.state.trainingStatus ? (
+		<p>
+			{this.state.trainingStatus.status} {this.state.trainingStatus.lastActionDateTime} { this.state.trainingStatus.message}
+		</p>) : undefined
+
 		return (
 			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
 				<h1>Kommentator</h1>
@@ -180,6 +188,7 @@ class Component extends React.Component<any, State> {
 				<p>
 					Detection score: {this.state.motionScore}
 				</p>
+				{trainingStatusDiv}
 				<div>
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
 					<button style={buttonStyle} onClick={this._trainPersonGroup}>Train person group</button>
@@ -232,6 +241,8 @@ class Component extends React.Component<any, State> {
 	private async _trainPersonGroup(ev: Event) {
 		console.info('Training person group...')
 		await this._faceApi.trainPersonGroup()
+		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
+		this.setState({trainingStatus})
 		console.info('Training person group...DONE. Results may still take some time.')
 	}
 }
