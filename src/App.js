@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Link, Route, Switch } from 'react-router-dom';
+import { Route, Switch } from 'react-router-dom';
+import { NavLink } from 'react-router-dom'
 
 import Home from './Home';
 import DiffCam from './DiffCam';
@@ -17,7 +18,7 @@ const navBarListStyle = {
 
 const navBarItemStyle = {
   float: 'left',
-  minWidth: '8em',
+  minWidth: '4em',
   borderRight: '1px solid #999'
 };
 
@@ -27,7 +28,7 @@ const navBarLinkStyle = {
   textAlign: 'center',
   padding: '14px 16px',
   textDecoration: 'none',
-  fontSize: '1.2em'
+  fontSize: '1.0em'
 };
 
 const navBarLogoLinkStyle = {
@@ -36,18 +37,20 @@ const navBarLogoLinkStyle = {
 };
 
 const navBarLogoStyle = {
-  width: 50,
-  height: 50
+  width: 40,
+  height: 40
 };
+
+const activeLinkStyle = { color: 'yellow', fontWeight: 'bold' }
 
 const Header = () => (
   <header>
     <nav>
       <ul style={navBarListStyle}>
-        <li style={navBarItemStyle}><Link style={navBarLogoLinkStyle} to='/'><img style={navBarLogoStyle} src="img/logo-50p-square-white-trans.png" /></Link></li>
-        <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/diffcam'>DiffCam</Link></li>
-        <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/identify-on-presence'>Identify on Presence</Link></li>
-        <li style={navBarItemStyle}><Link style={navBarLinkStyle} to='/about'>About</Link></li>
+        <li style={navBarItemStyle}><NavLink style={navBarLogoLinkStyle} activeStyle={activeLinkStyle} to='/'><img style={navBarLogoStyle} src="img/logo-50p-square-white-trans.png" /></NavLink></li>
+        <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/diffcam'>DiffCam</NavLink></li>
+        <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/identify-on-presence'>Insultor</NavLink></li>
+        <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/about'>About</NavLink></li>
       </ul>
     </nav>
     <div style={{ clear: 'both' }}></div>
@@ -55,7 +58,7 @@ const Header = () => (
 );
 
 const Main = () => (
-  <main style={{padding: '.5em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
+  <main style={{padding: '0em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
     <Switch>
       <Route exact path='/' component={Home}/>
       <Route exact path='/diffcam' component={DiffCam}/>

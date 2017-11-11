@@ -185,13 +185,11 @@ class Component extends React.Component<any, State> {
 
 		return (
 			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
-				<h1>Kommentator</h1>
+				{/* <h1>Kommentator</h1> */}
 				<h3>{this.state.commentatorStatus}</h3>
 				<h3>{this.state.commentatorEmoji}</h3>
 				<h3>State: {this.state.isPresenceDetected}</h3>
-				<p>
-					Detection score: {this.state.motionScore}
-				</p>
+				<p>Detection score: {this.state.motionScore}</p>
 				{trainingStatusDiv}
 				<div>
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
