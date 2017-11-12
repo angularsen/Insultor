@@ -3,6 +3,8 @@ export interface UserData {
 	anonymous?: boolean
 	/** ISO date/time string */
 	created: string
+	firstName: string
+	lastName: string
 }
 
 /** Result of adding a face image to a person. */

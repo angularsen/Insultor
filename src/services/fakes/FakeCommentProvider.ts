@@ -1,9 +1,8 @@
-import { IdentifyFacesResponse } from '../../../docs/FaceAPI/IdentifyFacesResponse'
-import { ICommentProvider } from '../CommentProvider'
+import { ICommentProvider, PersonInfo } from '../CommentProvider'
 
 export class FakeCommentProvider implements ICommentProvider {
-	public getComments(identifyFacesResponse: IdentifyFacesResponse): string[] {
-		return identifyFacesResponse.map((x, i) => 'Fake joke #' + i)
+	public getCommentForPerson(person: PersonInfo): string {
+		return 'Fake comment'
 	}
 }
 

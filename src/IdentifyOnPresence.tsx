@@ -7,13 +7,16 @@ type Moment = moment.Moment
 // import FaceIdentityProvider from './services/FaceIdentityProvider'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 
+import { Person } from '../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
 import { default as Commentator, DeliverCommentData, State as CommentatorState } from './services/Commentator'
+import CommentProvider from './services/CommentProvider'
 // import DiffCamEngine from './services/diff-cam-engine'
 import { default as PresenceDetector } from './services/PresenceDetector'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
+import { defaultSettings, Settings } from './Settings'
 
 const STATE_FACE_DETECTED = 'face detected'
 const STATE_PERSON_IDENTIFIED = 'person identified'
@@ -66,6 +69,25 @@ const getTimePeriodOfDay = () => {
 	return 'late evening'
 }
 
+async function getSettingsAsync(): Promise<Settings> {
+	const url = 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
+	const res = await fetch(url)
+	const ok = res.status >= 200 && res.status <= 300
+	if (!ok) {
+		console.warn('Failed to get settings.', res)
+		return defaultSettings
+	}
+
+	const settings: Settings = await res.json()
+	if (!settings || !settings.persons) {
+		console.error('Invalid settings stored.', settings)
+		return defaultSettings
+	}
+
+	console.info('Loaded settings.', settings)
+	return settings
+}
+
 interface State {
 	error?: string
 	isPresenceDetected: boolean
@@ -73,6 +95,8 @@ interface State {
 	commentatorStatus: string
 	commentatorEmoji: string
 	motionScore: number
+	/** App settings  */
+	settings: Settings
 	/** Currently speaking this text, undefined otherwise. */
 	commentData?: DeliverCommentData
 	videoSize: Size
@@ -88,6 +112,7 @@ interface StateStyle {
 class Component extends React.Component<any, State> {
 	private _faceApi: MicrosoftFaceApi
 	private _commentator: Commentator
+	private readonly _settingsPromise: Promise<Settings>
 
 	/**
 	 * Copying over images from live video for sending to Microsoft Face API to detect faces.
@@ -117,6 +142,7 @@ class Component extends React.Component<any, State> {
 			commentatorStatus: 'Ikke startet enda...',
 			isPresenceDetected: false,
 			motionScore: 0,
+			settings: defaultSettings,
 			trainingStatus: undefined,
 			videoSize: { width: 640, height: 480 },
 		}
@@ -125,6 +151,8 @@ class Component extends React.Component<any, State> {
 			faceApiConfig.myPersonalSubscriptionKey,
 			faceApiConfig.endpoint,
 			faceApiConfig.webstepPersonGroupId)
+
+		this._settingsPromise = getSettingsAsync()
 
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
@@ -146,6 +174,7 @@ class Component extends React.Component<any, State> {
 		})
 
 		this._commentator = new Commentator({
+			commentProvider: new CommentProvider(this._settingsPromise),
 			faceApi: this._faceApi,
 			presenceDetector,
 			videoService: new VideoService(video, faceDetectCanvas),
@@ -196,7 +225,7 @@ class Component extends React.Component<any, State> {
 			return (
 				<div style={{ color: 'white', background: 'black' }}>
 					<div style={{float: 'left'}}>
-						<img src={commentData.imageDataUrl} style={{width: 50}} />
+						<img src={commentData.imageDataUrl} style={{width: 20}} />
 						<span style={{ fontSize: '3em'}}>{commentData.name}</span>
 					</div>
 					<div>
@@ -217,6 +246,7 @@ class Component extends React.Component<any, State> {
 					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
 					<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
 					<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
+					<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
 				</div>
 				<div className='camera'>
 					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
@@ -258,6 +288,12 @@ class Component extends React.Component<any, State> {
 
 	private _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
 		this._commentator.toggleStartStop()
+	}
+
+	private async _getAllPersons(): Promise<void> {
+		console.info('Get all persons in person group...')
+		const persons: Person[] = await this._faceApi.getPersonsAsync()
+		console.info('Get all persons in person group...DONE.', persons)
 	}
 
 	private async _trainPersonGroupAsync(ev: React.MouseEvent<HTMLButtonElement>) {

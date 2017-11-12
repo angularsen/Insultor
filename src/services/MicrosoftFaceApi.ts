@@ -40,6 +40,8 @@ export interface IMicrosoftFaceApi {
 	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
 	/** Get person in person group. */
 	getPersonAsync(personId: AAGUID): Promise<Person>
+	/** Get all persons in person group. */
+	getPersonsAsync(): Promise<Person[]>
 	/** Get person group face image training status. */
 	getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus>
 	/**
@@ -116,9 +118,11 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const userData: UserData = {
 			anonymous: true,
 			created: moment().toISOString(),
+			firstName: 'Ukjent',
+			lastName: 'Vandrer',
 		}
 
-		const name = 'Some Geezer'
+		const name = 'Ukjent Vandrer'
 		const createdPerson = await this.createPersonAsync(name, userData)
 
 		const persistedFaceIds: string[] = []
@@ -162,6 +166,30 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			return detectedFaces
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to analyze face image.', err)
+			throw err
+		}
+	}
+
+	/** @inheritdoc */
+	public async getPersonsAsync(): Promise<Person[]> {
+		console.log(`MicrosoftFaceApi: Get all persons.`)
+
+		const method = 'GET'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons`
+		const headers = new Headers()
+		headers.append('Accept', 'application/json')
+		headers.append('Content-Type', 'application/json')
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+
+		try {
+			const res = await fetch(url, { method, headers })
+			await ensureSuccessAsync(res)
+
+			const persons: Person[] = await res.json()
+			console.log(`MicrosoftFaceApi: Got ${persons.length} persons in person group.`)
+			return persons
+		} catch (err) {
+			console.error('MicrosoftFaceApi: Failed to get persons in person group.', err)
 			throw err
 		}
 	}

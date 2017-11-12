@@ -1,5 +1,16 @@
 import * as FaceApiTypes from '../../docs/FaceAPI/DetectFacesResponse'
 
+// interface Jokes {
+// 	anger(val: number): string[]
+// 	beard(val: number): string[]
+// 	glasses(val: FaceApiTypes.GlassType): string[]
+// 	hair(val: FaceApiTypes.Hair): string[]
+// 	hairColor(val: FaceApiTypes.HairColor[]): string[]
+// 	happiness(val: number): string[]
+// 	moustache(val: number): string[]
+// 	neutral(val: number): string[]
+// }
+
 export const jokes = {
 	anger: (anger: number) => [`Whoa.. why so angry mister?`],
 	beard: (beard: number) => [
@@ -8,16 +19,16 @@ export const jokes = {
 	glasses: (glasses: FaceApiTypes.GlassType) => {
 		switch (glasses) {
 			case 'ReadingGlasses':
-			return 'I was elected to LEAD, not to READ.'
+				return ['I was elected to LEAD, not to READ.']
 
 			case 'Sunglasses':
-			return 'Dude, drop the sunglasses. It\'s not SUNNY inside!'
+				return ['Dude, drop the sunglasses. It\'s not SUNNY inside!']
 
 			case 'SwimmingGoggles':
-			return 'Swimming goggles... really? REALLY!?'
+				return ['Swimming goggles... really? REALLY!?']
 
 			default:
-			return undefined
+				return ['Mr Goggles!']
 		}
 	},
 	hair: (hair: FaceApiTypes.Hair) => ['Insert clever hair joke'],

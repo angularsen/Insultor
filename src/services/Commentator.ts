@@ -225,9 +225,9 @@ export interface DeliverCommentData {
 	/** The detected face ID */
 	imageDataUrl: string
 	/** The name of the person if identified */
-	name?: string
+	name: string
 	/** ID of person if identified. */
-	personId?: string
+	personId: string
 	/** The speech data for the comment being delivered */
 	speech: SpeakData
 	/** When comment was delivered, in order to throttle and avoid spam of certain persons. */
@@ -288,7 +288,7 @@ export class Commentator {
 			init : 'idle',
 			speech : new FakeSpeech(),
 		}
-		const opts: CommentatorOptions = { ...{}, ...inputOpts, ...defaultOpts }
+		const opts: CommentatorOptions = { ...{}, ...defaultOpts, ...inputOpts }
 
 		// Bind methods
 		this._onDeliverComments = this._onDeliverComments.bind(this)
@@ -441,8 +441,16 @@ export class Commentator {
 
 		console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
 
-		const anonymousPersons = await Promise.all(
-			unidentifiedFaces.map(face => this._faceApi.createAnonymousPersonWithFacesAsync([face.imageDataUrl])))
+		const anonymousPersons: IdentifiedPerson[] = await Promise.all(
+			unidentifiedFaces.map(async (faceWithImageData) => {
+				const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
+				return {
+					confidence: 1,
+					detectedFace: faceWithImageData,
+					person: anonymousPerson,
+					personId: anonymousPerson.personId,
+				}
+			}))
 
 		console.info(`Created ${anonymousPersons.length} anonymous persons.`)
 
@@ -464,19 +472,24 @@ export class Commentator {
 			}
 		}))
 
-		// // TODO Insert contextual comments here
-		const faceComments = anonymousPersons.map((anonPerson, i): DeliverCommentInput => {
-			const faceId = anonPerson.persistedFaceIds[0]
+		const faceComments = anonymousPersons.map((person, i): DeliverCommentInput => {
+			const faceId = person.detectedFace.faceId
 			const imageData = input.detectedFaces.find(df => df.faceId === faceId)
 			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
-			return {
-				comment: `Comment #${i} on face [${faceId}]`,
+			const comment = this._commentProvider.getCommentForPerson({
+				face: person.detectedFace.result,
+				person: person.person,
+			})
+
+			const result: DeliverCommentInput = {
+				comment,
 				faceId,
 				imageDataUrl: imageData.imageDataUrl,
-				name: anonPerson.name,
-				person: anonPerson,
+				name: person.person.name,
+				person: person.person,
 			}
+			return result
 		})
 
 		const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
@@ -484,13 +497,19 @@ export class Commentator {
 			const imageData = input.detectedFaces.find(img => img.faceId === faceId)
 			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
-			return {
-				comment: `Comment #${i} on person [${idPerson.personId}]`,
+			const comment = this._commentProvider.getCommentForPerson({
+				face: idPerson.detectedFace.result,
+				person: idPerson.person,
+			})
+
+			const result: DeliverCommentInput = {
+				comment,
 				faceId,
 				imageDataUrl: imageData && imageData.imageDataUrl,
 				name: idPerson.person.name,
 				person: idPerson.person,
 			}
+			return result
 		})
 
 		const commentInputs = personComments.concat(faceComments)
