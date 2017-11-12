@@ -12,7 +12,7 @@ import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { FakeSpeech } from './fakes/FakeSpeech'
 import { FakeVideoService } from './fakes/FakeVideoService'
 import { IMicrosoftFaceApi } from './MicrosoftFaceApi'
-import { IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
+import { DetectedFaceWithImageData, IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
 import { ISpeech, SpeakData } from './Speech'
 import { EventDispatcher, IEvent } from './utils/Events'
@@ -114,7 +114,7 @@ interface MyStateMachine {
 }
 
 interface FacesDetectedPayload {
-	detectFacesResult: DetectFaceResult[]
+	detectedFaces: DetectedFaceWithImageData[]
 }
 
 interface IdentifiedPerson {
@@ -122,18 +122,12 @@ interface IdentifiedPerson {
 	firstName: string
 	lastName: string
 	confidence: number
-	detectFaceResult: DetectFaceResult
-}
-
-interface DetectedFaceWithImageData {
-	faceId: string,
-	imageDataUrl: string,
+	detectedFace: DetectedFaceWithImageData
 }
 
 interface FacesIdentifiedPayload {
-	detectFacesImageData: DetectedFaceWithImageData[]
-	detectFacesResult: DetectFacesResponse
-	identifyFacesResult: IdentifyFacesResponse
+	detectedFaces: DetectedFaceWithImageData[]
+	identifiedFaces: IdentifyFacesResponse
 }
 
 interface MyConfig {
@@ -229,25 +223,35 @@ export interface StatusInfo {
 }
 
 export interface DeliverCommentData {
-	name: string
-	faceImageDataUrl: string
-	speakData: SpeakData
+	/** The name of the person if identified */
+	name?: string
+	/** The detected face ID */
+	imageDataUrl: string
+	/** The speech data for the comment being delivered */
+	speech: SpeakData
 }
 
 interface DeliverCommentInput {
+	/** The comment text to deliver */
 	comment: string
-	faceImageDataUrl: string
+	/** The detected face ID */
+	faceId: string
+	/** URL encoded data of image that detected the face  */
+	imageDataUrl: string
+	/** The name of the person if identified */
 	name?: string
 }
 
 export class Commentator {
-	public get onSpeak(): IEvent<DeliverCommentData> { return this._onDeliverCommentDispatcher }
+	public get onSpeakCompleted(): IEvent<void> { return this._onSpeakCompletedDispatcher }
+	public get onSpeak(): IEvent<DeliverCommentData> { return this._onSpeakDispatcher }
 	public get onStatusChanged(): IEvent<StatusInfo> { return this._onStatusChangedDispatcher }
 	public get onTransition(): IEvent<Lifecycle> { return this._onTransitionDispacher }
 	public get status(): StatusInfo { return this._status }
 
 	private readonly _onStatusChangedDispatcher = new EventDispatcher<StatusInfo>()
-	private readonly _onDeliverCommentDispatcher = new EventDispatcher<DeliverCommentData>()
+	private readonly _onSpeakCompletedDispatcher = new EventDispatcher<void>()
+	private readonly _onSpeakDispatcher = new EventDispatcher<DeliverCommentData>()
 	private readonly _onTransitionDispacher = new EventDispatcher<Lifecycle>()
 	private readonly _faceDetector: IPeriodicFaceDetector
 	private readonly _commentProvider: ICommentProvider
@@ -262,7 +266,7 @@ export class Commentator {
 	 * When in any other state, it is buffered in order to queue up while identifying/commenting
 	 * on a previous faces, which can take several seconds.
 	 */
-	private _facesDetectedBuffer: DetectFaceResult[] = []
+	private _facesToIdentify: DetectedFaceWithImageData[] = []
 	private _status: StatusInfo = { state: 'idle', text: 'Ikke startet enda', emoji: '😶' }
 
 	constructor(inputOpts: InputOpts) {
@@ -336,9 +340,9 @@ export class Commentator {
 			}
 		})
 
-		this._faceDetector.facesDetected.subscribe((result: DetectFacesResponse) => {
+		this._faceDetector.facesDetected.subscribe((result: DetectedFaceWithImageData[]) => {
 			try {
-				this.facesDetected({ detectFacesResult: result })
+				this.facesDetected({ detectedFaces: result })
 			} catch (err) {
 				console.error('Failed to handle detected faces.', error(err))
 			}
@@ -378,7 +382,9 @@ export class Commentator {
 	}
 
 	public facesDetected(payload: FacesDetectedPayload) {
-		this._facesDetectedBuffer.push(...payload.detectFacesResult)
+		const newFacesToIdentify: DetectedFaceWithImageData[] = payload.detectedFaces
+
+		this._facesToIdentify.push(...newFacesToIdentify)
 		if (this._fsm.can('facesDetected')) {
 			this._fsm.facesDetected()
 		}
@@ -415,15 +421,15 @@ export class Commentator {
 	private async _deliverCommentsAsync(input: FacesIdentifiedPayload): Promise<void> {
 		const MIN_CONFIDENCE = 0.5
 
-		const identifiedFaces = input.identifyFacesResult
+		const identifiedFaces = input.identifiedFaces
 			.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
 
-		const unidentifiedFaces = input.detectFacesResult
+		const unidentifiedFaces = input.detectedFaces
 			.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
 
-		console.info(`Identified ${identifiedFaces.length}/${input.detectFacesResult.length} faces.`)
+		console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
 
-		console.debug(`Get person info for ${input.detectFacesResult.length} faces...`)
+		console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
 
 		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
 			const personId = identifiedFace.candidates[0].personId
@@ -436,50 +442,63 @@ export class Commentator {
 			}
 		}))
 
-		const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map(x => ({
-			confidence: x.identifiedFace.candidates[0].confidence,
-			detectFaceResult: input.detectFacesResult.find(df => df.faceId === x.identifiedFace.faceId)!, // guaranteed to find faceId
-			firstName: x.person.name.split(' ')[0],
-			lastName: last(x.person.name.split(' ')),
-			personId: x.person.personId,
-		}))
+		const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map((x): IdentifiedPerson => {
+			const detectedFace = input.detectedFaces.find(df => df.faceId === x.identifiedFace.faceId)
+			if (!detectedFace) { throw new Error('Detected face not found. This is a bug.') }
+
+			return {
+				confidence: x.identifiedFace.candidates[0].confidence,
+				detectedFace,
+				firstName: x.person.name.split(' ')[0],
+				lastName: last(x.person.name.split(' ')),
+				personId: x.person.personId,
+			}
+		})
 
 		// TODO Insert contextual comments here
 		const faceComments = unidentifiedFaces.map((x, i): DeliverCommentInput => {
-			const imageData = input.detectFacesImageData.find(img => img.faceId === x.faceId)
-			if (!imageData) { throw new Error('Could not find image data for face ID: ' + x.faceId) }
+			const faceId = x.faceId
+			const imageData = input.detectedFaces.find(df => df.faceId === faceId)
+			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
 			return {
-				comment: `Comment #${i} on face [${x.faceId}]`,
-				faceImageDataUrl: imageData && imageData.imageDataUrl,
+				comment: `Comment #${i} on face [${faceId}]`,
+				faceId,
+				imageDataUrl: imageData.imageDataUrl,
 				name: undefined,
 			}
 		})
 
 		const personComments = identifiedPersons.map((x, i): DeliverCommentInput => {
-			const faceId = x.detectFaceResult.faceId
-			const imageData = input.detectFacesImageData.find(img => img.faceId === faceId)
+			const faceId = x.detectedFace.faceId
+			const imageData = input.detectedFaces.find(img => img.faceId === faceId)
 			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
 			return {
 				comment: `Comment #${i} on person [${x.personId}]`,
+				faceId,
 				imageDataUrl: imageData && imageData.imageDataUrl,
 				name: x.firstName,
 			}
 		})
 
-		const comments = personComments.concat(faceComments)
+		const commentInputs = personComments.concat(faceComments)
 
-		for (const comment of comments) {
-			console.info(`Speaking comment ${comment}...`)
-			const speakData = this._speech.speak(comment)
-			this._onDeliverCommentDispatcher.dispatch({
-				name: comment
-				speakData,
+		for (const commentInput of commentInputs) {
+			const logText = `Commenting on ${commentInput.name ? `person ${commentInput.name}` : `face ${commentInput.faceId}`}`
+			console.info(`${logText}...`)
+			const speech = this._speech.speak(commentInput.comment)
+
+			this._onSpeakDispatcher.dispatch({
+				imageDataUrl: commentInput.imageDataUrl,
+				name: commentInput.name,
+				speech,
 			})
-			await speakData.completion
-			console.info(`Speaking comment ${comment}...DONE.`)
+			await speech.completion
+			console.info(`${logText}...DONE`)
 		}
+
+		this._onSpeakCompletedDispatcher.dispatch(undefined)
 
 		this.commentsDelivered()
 	}
@@ -503,8 +522,8 @@ export class Commentator {
 				this._setStatus('Du er her fortsatt ja...', '😑')
 			}
 			default: {
-				if (this._facesDetectedBuffer.length > 0) {
-					console.info(`${this._facesDetectedBuffer.length} faces were detected in the meantime, identifying...`)
+				if (this._facesToIdentify.length > 0) {
+					console.info(`${this._facesToIdentify.length} faces were detected in the meantime, identifying...`)
 
 					// Can't transition while in transition
 					setTimeout(() => this._fsm.facesDetected(), 0)
@@ -516,35 +535,33 @@ export class Commentator {
 
 	private _onIdentifyFaces(lifecycle: Lifecycle) {
 		// Create a copy then clear buffer
-		const detectFacesResult = this._facesDetectedBuffer.slice()
-		this._facesDetectedBuffer = []
+		const facesToIdentify = this._facesToIdentify.slice()
+		this._facesToIdentify = []
 		console.info('Cleared faces detected buffer.')
 
 		this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
 
 		// Do not await here to not block transition, will run in background
-		this._identifyFacesAsync({ detectFacesResult })
+		this._identifyFacesAsync(facesToIdentify)
 	}
 
-	private async _identifyFacesAsync(payload: FacesDetectedPayload): Promise<void> {
+	private async _identifyFacesAsync(facesToIdentify: DetectedFaceWithImageData[]): Promise<void> {
 		console.info('_onIdentifyFacesAsync')
 		try {
-			const detectFacesResponse = payload.detectFacesResult
-			if (!detectFacesResponse || detectFacesResponse.length === 0) {
-				console.debug('payload', payload)
+			if (!facesToIdentify || facesToIdentify.length === 0) {
 				throw new Error('No detected faces were given.')
 			}
 
-			const faceIds = detectFacesResponse.map(x => x.faceId)
+			const faceIds = facesToIdentify.map(x => x.faceId)
 
-			console.debug(`Identifying ${detectFacesResponse.length} faces...`)
+			console.debug(`Identifying ${facesToIdentify.length} faces...`)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds)
-			console.debug(`Identifying ${detectFacesResponse.length} faces...Complete.`)
+			console.debug(`Identifying ${facesToIdentify.length} faces...Complete.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
 			this.facesIdentified({
-				detectFacesResult: detectFacesResponse,
-				identifyFacesResult: identifyFacesResponse,
+				detectedFaces: facesToIdentify,
+				identifiedFaces: identifyFacesResponse,
 			})
 		} catch (err) {
 			console.error('Failed to identify faces.', error(err))
@@ -557,7 +574,7 @@ export class Commentator {
 			this._setStatus('Hei.. er det noen her?', '🙂')
 			this._videoService.start()
 			this._presenceDetector.start(200)
-			this._facesDetectedBuffer = [] // clear buffer
+			this._facesToIdentify = [] // clear buffer
 		} else {
 			this._setStatus('Forlatt og alene igjen...', '😟')
 			this._faceDetector.stop()
@@ -573,13 +590,18 @@ export class Commentator {
 		this._faceDetector.stop()
 	}
 
-	private async _onPeriodicDetectFacesAsync(): Promise<DetectFaceResult[]> {
+	private async _onPeriodicDetectFacesAsync(): Promise<DetectedFaceWithImageData[]> {
 		console.debug(`On periodically detect faces...`)
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
 		console.debug(`Got image data url, detecting faces...`, this._faceApi, this._faceApi.detectFacesAsync)
 		const result = await this._faceApi.detectFacesAsync(imageDataUrl)
 		console.debug(`detect faces result`, result)
-		return result
+
+		return result.map(detectedFace => ({
+			faceId: detectedFace.faceId,
+			imageDataUrl,
+			result: detectedFace,
+		}))
 	}
 
 	private _setStatus(text: string, emoji: string) {

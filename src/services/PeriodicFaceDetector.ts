@@ -6,8 +6,14 @@ import {isDefined } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { error } from './utils/format'
 
+export interface DetectedFaceWithImageData {
+	faceId: string
+	result: DetectFaceResult
+	imageDataUrl: string
+}
+
 export interface IPeriodicFaceDetector {
-	readonly facesDetected: IEvent<DetectFacesResponse>
+	readonly facesDetected: IEvent<DetectedFaceWithImageData[]>
 	/**
 	 * Start periodic face detection.
 	 * @param intervalMs Minimum interval between each face detection request,
@@ -19,15 +25,15 @@ export interface IPeriodicFaceDetector {
 }
 
 export class PeriodicFaceDetector implements IPeriodicFaceDetector {
-	public get facesDetected(): IEvent<DetectFacesResponse> { return this._faceDetected }
+	public get facesDetected(): IEvent<DetectedFaceWithImageData[]> { return this._faceDetected }
 
 	private _isRunning: boolean
-	private _faceDetected = new EventDispatcher<DetectFacesResponse>()
+	private _faceDetected = new EventDispatcher<DetectedFaceWithImageData[]>()
 	private _timeoutHandle?: NodeJS.Timer
 
 	constructor(
 		private _intervalMs: number,
-		private _detectFacesAsync: () => Promise<DetectFacesResponse>,
+		private _detectFacesAsync: () => Promise<DetectedFaceWithImageData[]>,
 	) {
 		isDefined(_intervalMs, '_intervalMs')
 		isDefined(_detectFacesAsync, '_detectFacesAsync')

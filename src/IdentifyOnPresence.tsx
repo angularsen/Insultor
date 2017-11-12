@@ -8,7 +8,7 @@ type Moment = moment.Moment
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 
 import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
-import { default as Commentator, State as CommentatorState } from './services/Commentator'
+import { default as Commentator, DeliverCommentData, State as CommentatorState } from './services/Commentator'
 // import DiffCamEngine from './services/diff-cam-engine'
 import { default as PresenceDetector } from './services/PresenceDetector'
 import Speech from './services/Speech'
@@ -74,7 +74,7 @@ interface State {
 	commentatorEmoji: string
 	motionScore: number
 	/** Currently speaking this text, undefined otherwise. */
-	textToSpeak?: string
+	commentData?: DeliverCommentData
 	videoSize: Size
 	/** Last polled training status */
 	trainingStatus?: PersonGroupTrainingStatus
@@ -159,8 +159,20 @@ class Component extends React.Component<any, State> {
 			})
 		})
 
-		this._commentator.onSpeak.subscribe(speakData => {
-			this.setState({ textToSpeak: speakData.utterance.text })
+		this._commentator.onSpeak.subscribe(data => {
+			data.speech.completion.then(ev => {
+				this.setState({
+					
+	commentData: {}
+					// faceImageDataUrlToCommentOn: undefined,
+					// textToSpeak: undefined,
+				})
+			})
+
+			this.setState({ 
+				faceImageDataUrlToCommentOn: data.imageDataUrl,
+				textToSpeak: data.speech.utterance.text,
+			 })
 		})
 	}
 
@@ -182,6 +194,8 @@ class Component extends React.Component<any, State> {
 			<p>
 				{trainingStatus.status} {trainingStatus.lastActionDateTime} {trainingStatus.message}
 			</p>) : undefined
+
+			const commentingDiv = this._commentator.onSpeak //this.state.commentatorState === 'deliverComments'
 
 		return (
 			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
