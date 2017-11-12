@@ -1,6 +1,9 @@
+import * as moment from 'moment'
+type Moment = moment.Moment
+
 import { DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
-import { Person } from '../../docs/FaceAPI/Person'
+import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
@@ -19,24 +22,12 @@ async function ensureSuccessAsync(res: Response) {
 }
 
 export interface IMicrosoftFaceApi {
-	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
-	getPersonAsync(personId: AAGUID): Promise<Person>
-	identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse>
-}
-
-export class MicrosoftFaceApi implements IMicrosoftFaceApi {
-	private endpointIdentifyFace: string
-	private endpointDetectFace: string
-
-	constructor(
-		private readonly _subscriptionKey: string,
-		private readonly _endpoint: string,
-		private readonly _personGroupId: string,
-	) {
-		this.endpointDetectFace = _endpoint + 'detect'
-		this.endpointIdentifyFace = _endpoint + 'identify'
-	}
-
+	/** Add face image to a person in a person group. */
+	addPersonFaceAsync(personId: string, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse>
+	/** Create a person in a person group. */
+	createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse>
+	/** Create an anonymous person in a person group given one or more persisted face IDs from @see detectFacesAsync */
+	createAnonymousPersonWithFacesAsync(imageDataUrls: string[]): Promise<Person>
 	/**
 	 * Detect face and analyze facial attributes of photo with Microsoft Face API.
 	 * @param {string} imageDataUrl URL encoded representation of image, obtained by canvas.toDataUrl()
@@ -46,47 +37,11 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	 * Face entry shape: { faceId: string, faceRectangle: Object, faceLandmarks: Object, faceAttributes: Object }
 	 * @see https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f30395236
 	 */
-	public detectFacesAsync(imageDataUrl: string) {
-		console.log('MicrosoftFaceApi: Detect face and analyze facial attributes with Microsoft Face API.')
-
-		const method = 'POST'
-		const url = `${this.endpointDetectFace}?returnFaceId=true&returnFaceAttributes=${FACE_ATTRIBUTES}&returnFaceLandmarks=false`
-		const headers = new Headers()
-		headers.append('Content-Type', 'application/octet-stream')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
-
-		const body = this._createBlob(imageDataUrl)
-
-		return fetch(url, { method, headers, body })
-			.then(async res => {
-				if (!res.ok) {
-					switch (res.status) {
-						case 429: {
-							const responseBody = await res.json()
-							throw new HttpError('Rate limit exceeded.', res, responseBody)
-						}
-						default: {
-							const responseBody = await res.json()
-							throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, responseBody)
-						}
-					}
-				}
-				return res.json()
-			})
-			.then(detectedFaces => {
-				if (detectedFaces.length > 0) {
-					console.log(`MicrosoftFaceApi: Detected ${detectedFaces.length} faces.`, detectedFaces)
-				} else {
-					console.log(`MicrosoftFaceApi: No faces detected.`)
-				}
-				return detectedFaces
-			})
-			.catch(err => {
-				console.error('MicrosoftFaceApi: Failed to analyze face image.', err)
-				throw err
-			})
-	}
-
+	detectFacesAsync(imageDataUrl: string): Promise<DetectFacesResponse>
+	/** Get person in person group. */
+	getPersonAsync(personId: AAGUID): Promise<Person>
+	/** Get person group face image training status. */
+	getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus>
 	/**
 	 * Identify up to 10 faces given a list of face IDs from a prior call to detectFaces().
 	 * @param {Array} Array of query faces faceIds, created by the detectFace(). Each of the faces are identified independently.
@@ -94,13 +49,131 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	 * @returns Promise that on success returns the identified candidate person(s) for each query face. Otherwise returns the error.
 	 * @see https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f30395239
 	 */
-	public identifyFacesAsync(faceIds: AAGUID[]) {
+	identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse>
+	/** Start training the persisted face images for identifying faces later. */
+	trainPersonGroup(): Promise<void>
+}
+
+export class MicrosoftFaceApi implements IMicrosoftFaceApi {
+	constructor(
+		private readonly _subscriptionKey: string,
+		private readonly _endpoint: string,
+		private readonly _personGroupId: string,
+	) {
+	}
+
+	public async addPersonFaceAsync(personId: string, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse> {
+		console.log('MicrosoftFaceApi: Add person face...', personId)
+
+		const method = 'POST'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/persistedFaces`
+		const headers = this._getDefaultHeaders()
+		const body = this._createBlob(imageDataUrl)
+
+		try {
+			const res = await fetch(url, { method, headers, body })
+			await ensureSuccessAsync(res)
+			const result: AddPersonFaceResponse = await res.json()
+
+			console.log('MicrosoftFaceApi: Add person face...DONE.', personId)
+			return result
+		} catch (err) {
+			console.log('MicrosoftFaceApi: Failed to add person face.', personId, err)
+			throw err
+		}
+	}
+
+	/** @inheritdoc */
+	public async createPersonAsync(name: string, userData?: UserData | undefined): Promise<CreatePersonResponse> {
+		console.log('MicrosoftFaceApi: Create person...', name, userData)
+
+		const method = 'POST'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons`
+		const headers = this._getDefaultHeaders()
+
+		const body = {
+			name,
+			userData: JSON.stringify(userData),
+		}
+
+		try {
+			const res = await fetch(url, { method, headers, body })
+			await ensureSuccessAsync(res)
+			const person: CreatePersonResponse = await res.json()
+
+			console.log('MicrosoftFaceApi: Create person...DONE.', person)
+			return person
+		} catch (err) {
+			console.log('MicrosoftFaceApi: Failed to create person.', name, err)
+			throw err
+		}
+	}
+
+	/** @inheritdoc */
+	public async createAnonymousPersonWithFacesAsync(imageDataUrls: string[]): Promise<Person> {
+		console.log(`MicrosoftFaceApi: Add anonymous person with ${imageDataUrls.length} faces...`)
+
+		const userData: UserData = {
+			anonymous: true,
+			created: moment().toISOString(),
+		}
+
+		const name = 'Some Geezer'
+		const createdPerson = await this.createPersonAsync(name, userData)
+
+		const persistedFaceIds: string[] = []
+		for (const imageDataUrl of imageDataUrls) {
+			const personFace = await this.addPersonFaceAsync(createdPerson.personId, imageDataUrl)
+			persistedFaceIds.push(personFace.persistedFaceId)
+		}
+
+		const person: Person = {
+			name,
+			persistedFaceIds,
+			personId: createdPerson.personId,
+			userData,
+		}
+		console.log(`MicrosoftFaceApi: Add anonymous person with ${imageDataUrls.length} faces...DONE.`, person)
+		return person
+	}
+
+	/** @inheritdoc */
+	public async detectFacesAsync(imageDataUrl: string) {
+		console.log('MicrosoftFaceApi: Detect face and analyze facial attributes with Microsoft Face API.')
+
+		const method = 'POST'
+		const url = `${this._endpoint}detect?returnFaceId=true&returnFaceAttributes=${FACE_ATTRIBUTES}&returnFaceLandmarks=false`
+		const headers = new Headers()
+		headers.append('Content-Type', 'application/octet-stream')
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+
+		const body = this._createBlob(imageDataUrl)
+
+		try {
+			const res = await fetch(url, { method, headers, body })
+			await ensureSuccessAsync(res)
+			const detectedFaces: DetectFacesResponse = await res.json()
+
+			if (detectedFaces.length > 0) {
+				console.log(`MicrosoftFaceApi: Detected ${detectedFaces.length} faces.`, detectedFaces)
+			} else {
+				console.log(`MicrosoftFaceApi: No faces detected.`)
+			}
+			return detectedFaces
+		} catch (err) {
+			console.error('MicrosoftFaceApi: Failed to analyze face image.', err)
+			throw err
+		}
+	}
+
+	/** @inheritdoc */
+	public async identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse> {
 		if (faceIds.length < 1) { throw new Error('Expected between 1 and 10 face IDs, got ' + faceIds.length) }
 
 		console.log(`MicrosoftFaceApi: Identify ${faceIds.length} faces with Microsoft Face API.`)
 
 		const method = 'POST'
-		const url = this.endpointIdentifyFace
+		const url = `${this._endpoint}identify`
 		const headers = new Headers()
 		headers.append('Accept', 'application/json')
 		headers.append('Content-Type', 'application/json')
@@ -113,36 +186,25 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			// confidenceThreshold = 0..1 (default depends)
 		})
 
-		return fetch(url, { method, headers, body })
-			.then(async res => {
-				if (!res.ok) {
-					switch (res.status) {
-						case 429: {
-							throw new HttpError('Rate limit exceeded.', res, await res.json())
-						}
-						default: {
-							throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, await res.json())
-						}
-					}
-				}
-				return res.json()
-			})
-			.then(identifiedFaces => {
-				if (identifiedFaces.length > 0) {
-					console.log(`MicrosoftFaceApi: No faces were identified.`)
-				} else {
-					console.info(`MicrosoftFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
-				}
-				return identifiedFaces
-			})
-			.catch(err => {
-				console.error('MicrosoftFaceApi: Failed to identify faces.', err)
-				throw err
-			})
+		try {
+			const res = await fetch(url, { method, headers, body })
+			await ensureSuccessAsync(res)
+
+			const identifiedFaces: IdentifyFacesResponse = await res.json()
+			if (identifiedFaces.length > 0) {
+				console.log(`MicrosoftFaceApi: No faces were identified.`)
+			} else {
+				console.info(`MicrosoftFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
+			}
+			return identifiedFaces
+		} catch (err) {
+			console.error('MicrosoftFaceApi: Failed to identify faces.', err)
+			throw err
+		}
 	}
 
-	public getPersonAsync(personId: AAGUID) {
-
+	/** @inheritdoc */
+	public async getPersonAsync(personId: AAGUID) {
 		console.log(`MicrosoftFaceApi: Get person ${personId}.`)
 
 		const method = 'GET'
@@ -151,48 +213,49 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		headers.append('Accept', 'application/json')
 		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
-		return fetch(url, { method, headers })
-					.then(async res => {
-						await ensureSuccessAsync(res)
-						return res.json()
-					})
-					.catch(err => {
-						console.error('MicrosoftFaceApi: Failed to get person.', err)
-						throw err
-					})
+		try {
+			const res = await fetch(url, { method, headers })
+			await ensureSuccessAsync(res)
+			return res.json()
+		} catch (err) {
+			console.error('MicrosoftFaceApi: Failed to get person.', err)
+			throw err
+		}
 	}
 
-	public trainPersonGroup(): Promise<void> {
+	/** @inheritdoc */
+	public async trainPersonGroup(): Promise<void> {
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/train`
 		const headers = new Headers()
 		headers.append('Accept', 'application/json')
 		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
-		return fetch(url, { method, headers})
-		.then(async res => {
+		try {
+			const res = await fetch(url, { method, headers })
 			await ensureSuccessAsync(res)
-		}).catch(err => {
+		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
-		})
+		}
 	}
 
-	public getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
+	/** @inheritdoc */
+	public async getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/training`
 		const headers = new Headers()
 		headers.append('Accept', 'application/json')
 		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
 
-		return fetch(url, { method, headers})
-		.then(async res => {
+		try {
+			const res = await fetch(url, { method, headers })
 			await ensureSuccessAsync(res)
 			return res.json()
-		}).catch(err => {
+		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
-		})
+		}
 	}
 
 	// Convert a data URL to a file blob for POST request
@@ -217,6 +280,13 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 			return new Blob([arr], { type: contentType })
 		}
+	}
+
+	private _getDefaultHeaders() {
+		const headers = new Headers()
+		headers.append('Content-Type', 'application/octet-stream')
+		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		return headers
 	}
 
 }

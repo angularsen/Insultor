@@ -159,20 +159,16 @@ class Component extends React.Component<any, State> {
 			})
 		})
 
-		this._commentator.onSpeak.subscribe(data => {
-			data.speech.completion.then(ev => {
+		this._commentator.onSpeak.subscribe(commentData => {
+			commentData.speech.completion.then(ev => {
 				this.setState({
-					
-	commentData: {}
-					// faceImageDataUrlToCommentOn: undefined,
-					// textToSpeak: undefined,
+					commentData: undefined,
 				})
 			})
 
-			this.setState({ 
-				faceImageDataUrlToCommentOn: data.imageDataUrl,
-				textToSpeak: data.speech.utterance.text,
-			 })
+			this.setState({
+				commentData,
+			})
 		})
 	}
 
@@ -195,13 +191,26 @@ class Component extends React.Component<any, State> {
 				{trainingStatus.status} {trainingStatus.lastActionDateTime} {trainingStatus.message}
 			</p>) : undefined
 
-			const commentingDiv = this._commentator.onSpeak //this.state.commentatorState === 'deliverComments'
+		const getActiveCommentDiv = (commentData?: DeliverCommentData) => {
+			if (!commentData) { return undefined }
+			return (
+				<div style={{ color: 'white', background: 'black' }}>
+					<div style={{float: 'left'}}>
+						<img src={commentData.imageDataUrl} style={{width: 50}} />
+						<span style={{ fontSize: '3em'}}>{commentData.name}</span>
+					</div>
+					<div>
+						<p style={{ fontSize: '2em' }}>{commentData.speech.utterance.text}</p>
+					</div>
+				</div>)
+		}
 
 		return (
 			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
 				{/* <h1>Kommentator</h1> */}
 				<h3>{this.state.commentatorStatus}</h3>
 				<h3>{this.state.commentatorEmoji}</h3>
+				{getActiveCommentDiv(this.state.commentData)}
 				<p>Detection score: {this.state.motionScore}</p>
 				{trainingStatusDiv}
 				<div>
@@ -221,9 +230,6 @@ class Component extends React.Component<any, State> {
 					<canvas style={{ border: '1px solid lightgrey' }} id='faceapi-canvas' ref={(canvas) => this._faceDetectCanvas = canvas || undefined}
 						width={width} height={height}></canvas>
 				</div>
-				<p>
-					{this.state.textToSpeak ? this.state.textToSpeak : ''}
-				</p>
 				<p>
 					{this.state.error ? 'Error happened: ' + this.state.error : ''}
 				</p>

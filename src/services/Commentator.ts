@@ -119,8 +119,7 @@ interface FacesDetectedPayload {
 
 interface IdentifiedPerson {
 	personId: string
-	firstName: string
-	lastName: string
+	person: Person
 	confidence: number
 	detectedFace: DetectedFaceWithImageData
 }
@@ -223,12 +222,16 @@ export interface StatusInfo {
 }
 
 export interface DeliverCommentData {
-	/** The name of the person if identified */
-	name?: string
 	/** The detected face ID */
 	imageDataUrl: string
+	/** The name of the person if identified */
+	name?: string
+	/** ID of person if identified. */
+	personId?: string
 	/** The speech data for the comment being delivered */
 	speech: SpeakData
+	/** When comment was delivered, in order to throttle and avoid spam of certain persons. */
+	when: Date
 }
 
 interface DeliverCommentInput {
@@ -238,8 +241,10 @@ interface DeliverCommentInput {
 	faceId: string
 	/** URL encoded data of image that detected the face  */
 	imageDataUrl: string
-	/** The name of the person if identified */
-	name?: string
+	/** The name of the person */
+	name: string
+	/** Info about person. */
+	person: Person
 }
 
 export class Commentator {
@@ -260,6 +265,13 @@ export class Commentator {
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
+	private readonly _commentCooldownPerPerson = moment.duration(5, 'minutes')
+
+	/**
+	 * Key is personId. History of delivered comments, in order to avoid spamming comments
+	 * to the same persons.
+	 */
+	private readonly _commentHistory: Map<string, DeliverCommentData> = new Map<string, DeliverCommentData>()
 
 	/**
 	 * Buffer of detected faces, which is drained whenever in detectFaces state.
@@ -419,45 +431,42 @@ export class Commentator {
 	}
 
 	private async _deliverCommentsAsync(input: FacesIdentifiedPayload): Promise<void> {
-		const MIN_CONFIDENCE = 0.5
+		const CONFIDENT = 0.5
 
 		const identifiedFaces = input.identifiedFaces
-			.filter(x => x.candidates.filter(c => c.confidence >= MIN_CONFIDENCE).length > 0)
+			.filter(x => x.candidates.filter(c => c.confidence >= CONFIDENT).length > 0)
 
 		const unidentifiedFaces = input.detectedFaces
 			.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
 
 		console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
 
+		const anonymousPersons = await Promise.all(
+			unidentifiedFaces.map(face => this._faceApi.createAnonymousPersonWithFacesAsync([face.imageDataUrl])))
+
+		console.info(`Created ${anonymousPersons.length} anonymous persons.`)
+
 		console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
 
-		const identifiedFacesAndPersons = await Promise.all(identifiedFaces.map(async identifiedFace => {
+		const identifiedPersons: IdentifiedPerson[] = await Promise.all(identifiedFaces.map(async identifiedFace => {
 			const personId = identifiedFace.candidates[0].personId
 			const cacheKey = `MS_FACEAPI_GET_PERSON:person[${personId}]`
 			const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(personId))
 
-			return {
-				identifiedFace,
-				person,
-			}
-		}))
-
-		const identifiedPersons: IdentifiedPerson[] = identifiedFacesAndPersons.map((x): IdentifiedPerson => {
-			const detectedFace = input.detectedFaces.find(df => df.faceId === x.identifiedFace.faceId)
+			const detectedFace = input.detectedFaces.find(df => df.faceId === identifiedFace.faceId)
 			if (!detectedFace) { throw new Error('Detected face not found. This is a bug.') }
 
 			return {
-				confidence: x.identifiedFace.candidates[0].confidence,
+				confidence: identifiedFace.candidates[0].confidence,
 				detectedFace,
-				firstName: x.person.name.split(' ')[0],
-				lastName: last(x.person.name.split(' ')),
-				personId: x.person.personId,
+				person,
+				personId: person.personId,
 			}
-		})
+		}))
 
-		// TODO Insert contextual comments here
-		const faceComments = unidentifiedFaces.map((x, i): DeliverCommentInput => {
-			const faceId = x.faceId
+		// // TODO Insert contextual comments here
+		const faceComments = anonymousPersons.map((anonPerson, i): DeliverCommentInput => {
+			const faceId = anonPerson.persistedFaceIds[0]
 			const imageData = input.detectedFaces.find(df => df.faceId === faceId)
 			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
@@ -465,35 +474,47 @@ export class Commentator {
 				comment: `Comment #${i} on face [${faceId}]`,
 				faceId,
 				imageDataUrl: imageData.imageDataUrl,
-				name: undefined,
+				name: anonPerson.name,
+				person: anonPerson,
 			}
 		})
 
-		const personComments = identifiedPersons.map((x, i): DeliverCommentInput => {
-			const faceId = x.detectedFace.faceId
+		const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
+			const faceId = idPerson.detectedFace.faceId
 			const imageData = input.detectedFaces.find(img => img.faceId === faceId)
 			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
 			return {
-				comment: `Comment #${i} on person [${x.personId}]`,
+				comment: `Comment #${i} on person [${idPerson.personId}]`,
 				faceId,
 				imageDataUrl: imageData && imageData.imageDataUrl,
-				name: x.firstName,
+				name: idPerson.person.name,
+				person: idPerson.person,
 			}
 		})
 
 		const commentInputs = personComments.concat(faceComments)
 
 		for (const commentInput of commentInputs) {
+			if (!this._canCommentOnPerson(commentInput)) {
+				console.warn('Skip comment on person.', commentInput.person)
+				continue
+			}
+
 			const logText = `Commenting on ${commentInput.name ? `person ${commentInput.name}` : `face ${commentInput.faceId}`}`
 			console.info(`${logText}...`)
 			const speech = this._speech.speak(commentInput.comment)
 
-			this._onSpeakDispatcher.dispatch({
+			const commentData: DeliverCommentData = {
 				imageDataUrl: commentInput.imageDataUrl,
 				name: commentInput.name,
+				personId: commentInput.person.personId,
 				speech,
-			})
+				when: new Date(),
+			}
+
+			this._commentHistory.set(commentInput.person.personId, commentData)
+			this._onSpeakDispatcher.dispatch(commentData)
 			await speech.completion
 			console.info(`${logText}...DONE`)
 		}
@@ -501,6 +522,24 @@ export class Commentator {
 		this._onSpeakCompletedDispatcher.dispatch(undefined)
 
 		this.commentsDelivered()
+	}
+
+	private _canCommentOnPerson(commentInput: DeliverCommentInput): boolean {
+		const prevComment = this._commentHistory.get(commentInput.person.personId)
+		if (!prevComment) {
+			console.debug('OK, no previous comment.')
+			return true
+		}
+
+		const timeSinceLast = moment.duration(moment().diff(prevComment.when))
+		if (timeSinceLast > this._commentCooldownPerPerson) {
+			console.debug('OK, long enough since previous comment.', timeSinceLast)
+			return true
+		}
+
+		const waitTimeText = this._commentCooldownPerPerson.subtract(timeSinceLast).humanize()
+		console.info(`Too early to comment on person ${commentInput.name}, need to wait at least ${waitTimeText}.`)
+		return false
 	}
 
 	private _onDetectFaces(lifecycle: Lifecycle) {
@@ -593,7 +632,7 @@ export class Commentator {
 	private async _onPeriodicDetectFacesAsync(): Promise<DetectedFaceWithImageData[]> {
 		console.debug(`On periodically detect faces...`)
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-		console.debug(`Got image data url, detecting faces...`, this._faceApi, this._faceApi.detectFacesAsync)
+		console.debug(`Got image data url, detecting faces...`)
 		const result = await this._faceApi.detectFacesAsync(imageDataUrl)
 		console.debug(`detect faces result`, result)
 

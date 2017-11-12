@@ -69,7 +69,7 @@ export class VideoService implements IVideoService {
 		if (!context) { throw new Error('Unable to get context of canvas.') }
 
 		// Draw current content of <video> element to canvas
-		context.drawImage(this._video, 0, 0, this._video.width, this._video.height)
+		context.drawImage(this._video, 0, 0, this._video.videoWidth, this._video.videoHeight)
 		return this._copyImageCanvas.toDataURL('image/png')
 	}
 

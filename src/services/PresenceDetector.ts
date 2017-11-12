@@ -5,10 +5,26 @@ import { EventDispatcher, IEvent } from './utils/Events'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
 
-const motionThreshold = 100	// Motion detected if frame.score value is greater than this
-const initialDetectionDurationMs = 500
-const maxInitialDetectionGapMs = 500
-const maxPresenceDetectionGapMs = 5000 // Once present, be lenient about person standing still for a few seconds
+const motionThreshold = 50	// Motion detected if frame.score value is greater than this
+
+/**
+ * During transition from not detected to detected, if any two motion detected samples are at least this
+ * much time apart, it will complete the transition.
+ */
+const initialDetectionDurationMs = 200
+
+/**
+ * During transition from not detected to detected, this is the max time between two motion detection samples
+ * before resetting the transition.
+ */
+const maxInitialDetectionGapMs = 5000
+
+/**
+ * While in detected state, this is the max time since last motion detected before transitioning
+ * back to not detected state.
+ * Once present, be lenient about person standing still for a few seconds.
+ */
+const maxPresenceDetectionGapMs = 10000
 
 interface DefaultOpts {
 	diffHeight: number
@@ -123,10 +139,10 @@ export class PresenceDetector implements IPresenceDetector {
 	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score
 	private _onMotionScore(motionScore: number, receivedOnDate: Moment = moment()) {
 		const wasDetected = this.isDetected
-		const isDetectedJustNow = motionScore > this._opts.motionScoreThreshold
+		const isDetectedNow = motionScore > this._opts.motionScoreThreshold
 
 		if (!wasDetected) {
-			if (isDetectedJustNow) {
+			if (isDetectedNow) {
 				if (this._motionStart === undefined) {
 					console.info('Initial detection of person.')
 					this._motionStart = moment()
@@ -147,7 +163,7 @@ export class PresenceDetector implements IPresenceDetector {
 				}
 			}
 		} else {
-			if (isDetectedJustNow) {
+			if (isDetectedNow) {
 				// Presence is sustained
 				this._lastMotionOn = moment()
 			} else {
