@@ -188,7 +188,6 @@ class Component extends React.Component<any, State> {
 				{/* <h1>Kommentator</h1> */}
 				<h3>{this.state.commentatorStatus}</h3>
 				<h3>{this.state.commentatorEmoji}</h3>
-				<h3>State: {this.state.isPresenceDetected}</h3>
 				<p>Detection score: {this.state.motionScore}</p>
 				{trainingStatusDiv}
 				<div>

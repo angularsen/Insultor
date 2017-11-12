@@ -32,9 +32,15 @@ export class VideoService implements IVideoService {
 
 	constructor(
 		private readonly _video: HTMLVideoElement = document.createElement('video'),
-		private readonly _copyImageCanvas: HTMLCanvasElement = document.createElement('canvas')) {
+		private readonly _copyImageCanvas: HTMLCanvasElement = document.createElement('canvas'),
+		private readonly _width: number = 200,
+		// private readonly _height: number = 200,
+		) {
 		isDefined(_video, '_video')
 		isDefined(_copyImageCanvas, '_copyImageCanvas')
+
+		_video.width = _width
+		// _video.height = _height
 
 		// console.log('Initialize DiffCamEngine')
 		// DiffCamEngine.init({
@@ -69,20 +75,30 @@ export class VideoService implements IVideoService {
 
 	public start(): void {
 		console.info('start(): Starting video...')
-		navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-			.then((stream) => {
-				console.debug('Requesting video...OK!')
-				this.videoStream = stream
-				this._video.srcObject = stream
-				this._video.play()
-				this.isPlaying = true
+		navigator.mediaDevices.getUserMedia({
+			audio: false,
+			video: {
+				facingMode: 'user',
+				frameRate: { ideal: 10, max: 30 },
+				width: this._width,
+			},
+		})
+		.then((stream) => {
+			console.debug('Requesting video...OK!')
+			this.videoStream = stream
+			this._video.srcObject = stream
 
-				console.log('Starting video...OK.')
-			})
-			.catch((err) => {
-				console.error('Starting video...FAILED!', err)
-				alert('Could not access video.\n\nSee console for details.')
-			})
+			this._video.onloadedmetadata = (e) => {
+				this._video.play()
+			}
+
+			this.isPlaying = true
+			console.log('Starting video...OK.')
+		})
+		.catch((err) => {
+			console.error('Starting video...FAILED!', err)
+			alert('Could not access video.\n\nSee console for details.')
+		})
 	}
 
 	public stop(): void {

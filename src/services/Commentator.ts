@@ -125,7 +125,13 @@ interface IdentifiedPerson {
 	detectFaceResult: DetectFaceResult
 }
 
+interface DetectedFaceWithImageData {
+	faceId: string,
+	imageDataUrl: string,
+}
+
 interface FacesIdentifiedPayload {
+	detectFacesImageData: DetectedFaceWithImageData[]
 	detectFacesResult: DetectFacesResponse
 	identifyFacesResult: IdentifyFacesResponse
 }
@@ -222,14 +228,26 @@ export interface StatusInfo {
 	text: string
 }
 
+export interface DeliverCommentData {
+	name: string
+	faceImageDataUrl: string
+	speakData: SpeakData
+}
+
+interface DeliverCommentInput {
+	comment: string
+	faceImageDataUrl: string
+	name?: string
+}
+
 export class Commentator {
-	public get onSpeak(): IEvent<SpeakData> { return this._onSpeakDispatcher }
+	public get onSpeak(): IEvent<DeliverCommentData> { return this._onDeliverCommentDispatcher }
 	public get onStatusChanged(): IEvent<StatusInfo> { return this._onStatusChangedDispatcher }
 	public get onTransition(): IEvent<Lifecycle> { return this._onTransitionDispacher }
 	public get status(): StatusInfo { return this._status }
 
 	private readonly _onStatusChangedDispatcher = new EventDispatcher<StatusInfo>()
-	private readonly _onSpeakDispatcher = new EventDispatcher<SpeakData>()
+	private readonly _onDeliverCommentDispatcher = new EventDispatcher<DeliverCommentData>()
 	private readonly _onTransitionDispacher = new EventDispatcher<Lifecycle>()
 	private readonly _faceDetector: IPeriodicFaceDetector
 	private readonly _commentProvider: ICommentProvider
@@ -427,14 +445,38 @@ export class Commentator {
 		}))
 
 		// TODO Insert contextual comments here
-		const faceComments = unidentifiedFaces.map((x, i) => `Comment #${i} on face [${x.faceId}]`)
-		const personComments = identifiedPersons.map((x, i) => `Comment #${i} on person [${x.personId}]`)
+		const faceComments = unidentifiedFaces.map((x, i): DeliverCommentInput => {
+			const imageData = input.detectFacesImageData.find(img => img.faceId === x.faceId)
+			if (!imageData) { throw new Error('Could not find image data for face ID: ' + x.faceId) }
+
+			return {
+				comment: `Comment #${i} on face [${x.faceId}]`,
+				faceImageDataUrl: imageData && imageData.imageDataUrl,
+				name: undefined,
+			}
+		})
+
+		const personComments = identifiedPersons.map((x, i): DeliverCommentInput => {
+			const faceId = x.detectFaceResult.faceId
+			const imageData = input.detectFacesImageData.find(img => img.faceId === faceId)
+			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
+
+			return {
+				comment: `Comment #${i} on person [${x.personId}]`,
+				imageDataUrl: imageData && imageData.imageDataUrl,
+				name: x.firstName,
+			}
+		})
+
 		const comments = personComments.concat(faceComments)
 
 		for (const comment of comments) {
 			console.info(`Speaking comment ${comment}...`)
 			const speakData = this._speech.speak(comment)
-			this._onSpeakDispatcher.dispatch(speakData)
+			this._onDeliverCommentDispatcher.dispatch({
+				name: comment
+				speakData,
+			})
 			await speakData.completion
 			console.info(`Speaking comment ${comment}...DONE.`)
 		}
