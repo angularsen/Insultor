@@ -223,13 +223,13 @@ class Component extends React.Component<any, State> {
 
 		const tmp = commentData ? (
 			<div>
-					<div style={{ textAlign: 'center', fontSize: '10em' }}>{this.state.commentatorEmoji}</div>
+					<div style={{ textAlign: 'center', fontSize: 49/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
 					<div style={{ textAlign: 'center', fontSize: '2em' }}><span>{commentData.name}</span></div>
 					<div style={{ textAlign: 'center' }}><img src={commentData.imageDataUrl} style={{ width: 400 }} /></div>
 			</div>
 				) : (
 				<div>
-					<div style={{ textAlign: 'center', fontSize: '10em' }}>{this.state.commentatorEmoji}</div>
+					<div style={{ textAlign: 'center', fontSize: 49/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
 					<div style={{ textAlign: 'center', fontSize: '2em' }}>{this.state.commentatorStatus}</div>
 					{
 						// tslint:disable-next-line:max-line-length
