@@ -2,7 +2,7 @@
 const defaultOpts: ISpeechOpts = {
 	// voiceURI: 'Microsoft David Desktop - English (United States)',
 	lang: 'nb-NO',
-	rate: 2,
+	rate: 1.8,
 	// pitch: 0.15
 }
 
@@ -30,14 +30,13 @@ export class Speech implements ISpeech {
 		}
 	}
 
-	public speak(text: string, opts: ISpeechOpts): SpeakData {
-
+	public speak(text: string, opts?: ISpeechOpts): SpeakData {
+		// Note: some voices don't support altering params
 		const utter = new SpeechSynthesisUtterance()
+		const utterProps = {...defaultOpts, ...opts, text }
+		Object.assign(utter, utterProps)
 
 		const completion = new Promise<SpeechSynthesisEvent>((resolve, reject) => {
-			// Note: some voices don't support altering params
-			Object.assign(utter, defaultOpts, opts, { text })
-
 			utter.onerror = (ev: ErrorEvent) => {
 				console.error('Speech failed: ' + utter.text, utter, ev)
 				reject(ev.error)

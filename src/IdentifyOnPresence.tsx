@@ -124,6 +124,8 @@ class Component extends React.Component<any, State> {
 	 */
 	private _motionDiffCanvas?: HTMLCanvasElement
 
+	private readonly _speech = new Speech()
+
 	/**
 	 * Live video element.
 	 */
@@ -177,7 +179,7 @@ class Component extends React.Component<any, State> {
 			commentProvider: new CommentProvider(this._settingsPromise),
 			faceApi: this._faceApi,
 			presenceDetector,
-			speech: new Speech(),
+			speech: this._speech,
 			videoService: new VideoService(video, faceDetectCanvas),
 		})
 
@@ -248,6 +250,7 @@ class Component extends React.Component<any, State> {
 					{trainingStatusDiv}
 					<div>
 						<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
+						<button style={buttonStyle} onClick={() => this._speakRandom()}>Si noe</button>
 						<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
 						<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
 						<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
@@ -313,6 +316,10 @@ class Component extends React.Component<any, State> {
 		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
 		console.info('Query person group training status...DONE.', trainingStatus)
 		this.setState({trainingStatus})
+	}
+
+	private _speakRandom() {
+		this._speech.speak('Dette er en setning for å teste norsk.')
 	}
 }
 
