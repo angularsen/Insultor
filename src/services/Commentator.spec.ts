@@ -13,7 +13,7 @@ import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
 import { FakePeriodicFaceDetector } from './fakes/FakePeriodicFaceDetector'
 import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { FakeVideoService } from './fakes/FakeVideoService'
-import { IPeriodicFaceDetector } from './PeriodicFaceDetector'
+import { DetectedFaceWithImageData, IPeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
 import { IVideoService } from './VideoService'
 
@@ -58,7 +58,8 @@ const getMocks = () => ({
 })
 
 const fakeFaceId = 'fake face ID'
-const singleFaceDetectedResult: DetectFacesResponse = [{ faceId: fakeFaceId }] as DetectFacesResponse
+// tslint:disable-next-line:no-object-literal-type-assertion
+const singleFaceDetectedResult: DetectedFaceWithImageData[] = [{ faceId: fakeFaceId } as DetectedFaceWithImageData]
 const fakeOpts = () => ({
 	faceApi: new FakeMicrosoftFaceApi(),
 	presenceDetector: new FakePresenceDetector(),
@@ -223,12 +224,12 @@ describe('Commentator', () => {
 			})
 
 			// Insert detected faces while in identiyFaces and deliverComments states
-			const getDetectFaceResult = (faceId: string): DetectFaceResult => {
+			const getDetectFaceResult = (faceId: string): DetectedFaceWithImageData => {
 				// Intentionally only populate part of it
 				// tslint:disable-next-line:no-object-literal-type-assertion
 				return {
 					faceId,
-				} as DetectFaceResult
+				} as DetectedFaceWithImageData
 			}
 
 			const [face1, face2, face3, face4] = [1, 2, 3, 4].map(id => getDetectFaceResult('fake face id ' + id))

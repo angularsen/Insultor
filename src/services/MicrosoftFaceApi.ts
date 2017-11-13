@@ -135,7 +135,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			name,
 			persistedFaceIds,
 			personId: createdPerson.personId,
-			userData,
+			userData: JSON.stringify(userData),
 		}
 		console.log(`MicrosoftFaceApi: Add anonymous person with ${imageDataUrls.length} faces...DONE.`, person)
 		return person

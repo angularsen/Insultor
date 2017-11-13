@@ -1,11 +1,31 @@
 import { DetectFacesResponse } from '../../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../../docs/FaceAPI/IdentifyFacesResponse'
-import { Person } from '../../../docs/FaceAPI/Person'
+import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../../docs/FaceAPI/Person'
+import PersonGroupTrainingStatus from '../../../docs/FaceAPI/PersonGroupTrainingStatus'
 import { IMicrosoftFaceApi } from '../MicrosoftFaceApi'
 
 export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	constructor(
 		private readonly _detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
+	}
+
+	public addPersonFaceAsync(personId: string, imageDataUrl: string): Promise<AddPersonFaceResponse> {
+		throw new Error('Method not implemented.')
+	}
+	public createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse> {
+		throw new Error('Method not implemented.')
+	}
+	public createAnonymousPersonWithFacesAsync(imageDataUrls: string[]): Promise<Person> {
+		throw new Error('Method not implemented.')
+	}
+	public getPersonsAsync(): Promise<Person[]> {
+		throw new Error('Method not implemented.')
+	}
+	public getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
+		throw new Error('Method not implemented.')
+	}
+	public trainPersonGroup(): Promise<void> {
+		throw new Error('Method not implemented.')
 	}
 
 	public getPersonAsync(personId: AAGUID): Promise<Person> {
