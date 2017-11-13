@@ -20,34 +20,6 @@ import { error } from './utils/format'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
 
-// class Logger {
-// 	// public debug = Function.prototype.bind.call(console.debug, console)
-// 	public debug = (...args: any[]) => {
-
-// 		return console.log.apply(this, args)
-// 	}
-
-// 	constructor(public name: string) { }
-
-// 	public debug(...args: any[]): void {
-// 		console.log.apply(this, args)
-// 	}
-// 	// (msg: string, ...optionalParams: any[]) {
-// 	// 	console.debug(`${name}: ${msg}`, optionalParams)
-// 	// }
-// 	public info(msg: string, ...optionalParams: any[]) {
-// 		console.info(`${name}: ${msg}`, optionalParams)
-// 	}
-// 	public warn(msg: string, ...optionalParams: any[]) {
-// 		console.warn(`${name}: ${msg}`, optionalParams)
-// 	}
-// 	public error(msg: string, ...optionalParams: any[]) {
-// 		console.error(`${name}: ${msg}`, optionalParams)
-// 	}
-// }
-
-// const log = new Logger('Commentator')
-
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
 function contains(arr: any[], predicate: (item: any, idx: number) => boolean) {
@@ -265,7 +237,7 @@ export class Commentator {
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
-	private readonly _commentCooldownPerPerson = moment.duration(5, 'minutes')
+	private readonly _commentCooldownPerPerson = moment.duration(1, 'minutes')
 
 	/**
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
