@@ -23,7 +23,7 @@ export interface Person {
 	personId: AAGUID
 	persistedFaceIds: AAGUID[]
 	name: string
-	userData: UserData
+	userData: string
 }
 
 export default Person

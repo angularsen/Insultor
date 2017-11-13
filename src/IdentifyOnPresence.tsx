@@ -177,6 +177,7 @@ class Component extends React.Component<any, State> {
 			commentProvider: new CommentProvider(this._settingsPromise),
 			faceApi: this._faceApi,
 			presenceDetector,
+			speech: new Speech(),
 			videoService: new VideoService(video, faceDetectCanvas),
 		})
 
@@ -207,7 +208,7 @@ class Component extends React.Component<any, State> {
 	}
 
 	public render() {
-		const { trainingStatus, videoSize } = this.state
+		const { commentData, trainingStatus, videoSize } = this.state
 		const { width, height } = videoSize
 
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
@@ -220,49 +221,53 @@ class Component extends React.Component<any, State> {
 				{trainingStatus.status} {trainingStatus.lastActionDateTime} {trainingStatus.message}
 			</p>) : undefined
 
-		const getActiveCommentDiv = (commentData?: DeliverCommentData) => {
-			if (!commentData) { return undefined }
-			return (
-				<div style={{ color: 'white', background: 'black' }}>
-					<div style={{float: 'left'}}>
-						<img src={commentData.imageDataUrl} style={{width: 20}} />
-						<span style={{ fontSize: '3em'}}>{commentData.name}</span>
-					</div>
-					<div>
-						<p style={{ fontSize: '2em' }}>{commentData.speech.utterance.text}</p>
-					</div>
-				</div>)
-		}
+		const tmp = commentData ? (
+			<div>
+					<div style={{ textAlign: 'center', fontSize: '10em' }}>{this.state.commentatorEmoji}</div>
+					<div style={{ textAlign: 'center', fontSize: '2em' }}><span>{commentData.name}</span></div>
+					<div style={{ textAlign: 'center' }}><img src={commentData.imageDataUrl} style={{ width: 400 }} /></div>
+			</div>
+				) : (
+				<div>
+					<div style={{ textAlign: 'center', fontSize: '10em' }}>{this.state.commentatorEmoji}</div>
+					<div style={{ textAlign: 'center', fontSize: '2em' }}>{this.state.commentatorStatus}</div>
+					{
+						// tslint:disable-next-line:max-line-length
+						/* <div style={{ textAlign: 'center' }}><img src="https://cdn.images.express.co.uk/img/dynamic/78/590x/secondary/Kim-Jong-un-missile-launch-1032502.jpg" style={{ width: 400 }} /></div> */}
+				</div>
+				)
 
 		return (
-			<div style={{ color: stateStyle.color, background: stateStyle.background }}>
-				{/* <h1>Kommentator</h1> */}
-				<h3>{this.state.commentatorStatus}</h3>
-				<h3>{this.state.commentatorEmoji}</h3>
-				{getActiveCommentDiv(this.state.commentData)}
-				<p>Detection score: {this.state.motionScore}</p>
-				{trainingStatusDiv}
-				<div>
-					<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
-					<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
-					<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
-					<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
+			<div>
+				<div style={{ color: 'white', background: 'black', minHeight: '500px', width: '100%' }}>
+					{tmp}
 				</div>
-				<div className='camera'>
-					<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
-					width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
+
+				<div style={{ color: stateStyle.color, background: stateStyle.background }}>
+					<p>Detection score: {this.state.motionScore}</p>
+					{trainingStatusDiv}
+					<div>
+						<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
+						<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
+						<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
+						<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
+					</div>
+					<div className='camera'>
+						<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
+							width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
+					</div>
+					<div>
+						<canvas style={{ border: '1px solid lightgrey' }} id='motion-diff-canvas'
+							ref={(canvas) => this._motionDiffCanvas = canvas || undefined}></canvas>
+					</div>
+					<div>
+						<canvas style={{ border: '1px solid lightgrey' }} id='faceapi-canvas' ref={(canvas) => this._faceDetectCanvas = canvas || undefined}
+							></canvas>
+					</div>
+					<p>
+						{this.state.error ? 'Error happened: ' + this.state.error : ''}
+					</p>
 				</div>
-				<div>
-					<canvas style={{ border: '1px solid lightgrey' }} id='motion-diff-canvas'
-						ref={(canvas) => this._motionDiffCanvas = canvas || undefined}></canvas>
-				</div>
-				<div>
-					<canvas style={{ border: '1px solid lightgrey' }} id='faceapi-canvas' ref={(canvas) => this._faceDetectCanvas = canvas || undefined}
-						width={width} height={height}></canvas>
-				</div>
-				<p>
-					{this.state.error ? 'Error happened: ' + this.state.error : ''}
-				</p>
 			</div>
 		)
 	}

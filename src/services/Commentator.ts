@@ -3,7 +3,7 @@ type Moment = moment.Moment
 
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
-import Person from '../../docs/FaceAPI/Person'
+import Person, { UserData } from '../../docs/FaceAPI/Person'
 import Cache from './Cache'
 import { ICommentProvider } from './CommentProvider'
 import { FakeCommentProvider } from './fakes/FakeCommentProvider'
@@ -431,114 +431,119 @@ export class Commentator {
 	}
 
 	private async _deliverCommentsAsync(input: FacesIdentifiedPayload): Promise<void> {
-		const CONFIDENT = 0.5
+		try {
+			const CONFIDENT = 0.5
 
-		const identifiedFaces = input.identifiedFaces
-			.filter(x => x.candidates.filter(c => c.confidence >= CONFIDENT).length > 0)
+			const identifiedFaces = input.identifiedFaces
+				.filter(x => x.candidates.filter(c => c.confidence >= CONFIDENT).length > 0)
 
-		const unidentifiedFaces = input.detectedFaces
-			.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
+			const unidentifiedFaces = input.detectedFaces
+				.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
 
-		console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
+			console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
 
-		const anonymousPersons: IdentifiedPerson[] = await Promise.all(
-			unidentifiedFaces.map(async (faceWithImageData) => {
-				const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
+			const anonymousPersons: IdentifiedPerson[] = await Promise.all(
+				unidentifiedFaces.map(async (faceWithImageData) => {
+					const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
+					return {
+						confidence: 1,
+						detectedFace: faceWithImageData,
+						person: anonymousPerson,
+						personId: anonymousPerson.personId,
+					}
+				}))
+
+			console.info(`Created ${anonymousPersons.length} anonymous persons.`)
+
+			console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
+
+			const identifiedPersons: IdentifiedPerson[] = await Promise.all(identifiedFaces.map(async identifiedFace => {
+				const personId = identifiedFace.candidates[0].personId
+				const cacheKey = `MS_FACEAPI_GET_PERSON:person[${personId}]`
+				const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(personId))
+
+				const detectedFace = input.detectedFaces.find(df => df.faceId === identifiedFace.faceId)
+				if (!detectedFace) { throw new Error('Detected face not found. This is a bug.') }
+
 				return {
-					confidence: 1,
-					detectedFace: faceWithImageData,
-					person: anonymousPerson,
-					personId: anonymousPerson.personId,
+					confidence: identifiedFace.candidates[0].confidence,
+					detectedFace,
+					person,
+					personId: person.personId,
 				}
 			}))
 
-		console.info(`Created ${anonymousPersons.length} anonymous persons.`)
+			const faceComments = anonymousPersons.map((person, i): DeliverCommentInput => {
+				const faceId = person.detectedFace.faceId
+				const imageData = input.detectedFaces.find(df => df.faceId === faceId)
+				if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
-		console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
+				const comment = this._commentProvider.getCommentForPerson({
+					face: person.detectedFace.result,
+					person: person.person,
+				})
 
-		const identifiedPersons: IdentifiedPerson[] = await Promise.all(identifiedFaces.map(async identifiedFace => {
-			const personId = identifiedFace.candidates[0].personId
-			const cacheKey = `MS_FACEAPI_GET_PERSON:person[${personId}]`
-			const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(personId))
-
-			const detectedFace = input.detectedFaces.find(df => df.faceId === identifiedFace.faceId)
-			if (!detectedFace) { throw new Error('Detected face not found. This is a bug.') }
-
-			return {
-				confidence: identifiedFace.candidates[0].confidence,
-				detectedFace,
-				person,
-				personId: person.personId,
-			}
-		}))
-
-		const faceComments = anonymousPersons.map((person, i): DeliverCommentInput => {
-			const faceId = person.detectedFace.faceId
-			const imageData = input.detectedFaces.find(df => df.faceId === faceId)
-			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
-
-			const comment = this._commentProvider.getCommentForPerson({
-				face: person.detectedFace.result,
-				person: person.person,
+				const result: DeliverCommentInput = {
+					comment,
+					faceId,
+					imageDataUrl: imageData.imageDataUrl,
+					name: person.person.name,
+					person: person.person,
+				}
+				return result
 			})
 
-			const result: DeliverCommentInput = {
-				comment,
-				faceId,
-				imageDataUrl: imageData.imageDataUrl,
-				name: person.person.name,
-				person: person.person,
-			}
-			return result
-		})
+			const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
+				const faceId = idPerson.detectedFace.faceId
+				const imageData = input.detectedFaces.find(img => img.faceId === faceId)
+				if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
-		const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
-			const faceId = idPerson.detectedFace.faceId
-			const imageData = input.detectedFaces.find(img => img.faceId === faceId)
-			if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
+				const comment = this._commentProvider.getCommentForPerson({
+					face: idPerson.detectedFace.result,
+					person: idPerson.person,
+				})
 
-			const comment = this._commentProvider.getCommentForPerson({
-				face: idPerson.detectedFace.result,
-				person: idPerson.person,
+				const result: DeliverCommentInput = {
+					comment,
+					faceId,
+					imageDataUrl: imageData && imageData.imageDataUrl,
+					name: idPerson.person.name,
+					person: idPerson.person,
+				}
+				return result
 			})
 
-			const result: DeliverCommentInput = {
-				comment,
-				faceId,
-				imageDataUrl: imageData && imageData.imageDataUrl,
-				name: idPerson.person.name,
-				person: idPerson.person,
-			}
-			return result
-		})
+			const commentInputs = personComments.concat(faceComments)
 
-		const commentInputs = personComments.concat(faceComments)
+			for (const commentInput of commentInputs) {
+				if (!this._canCommentOnPerson(commentInput)) {
+					console.warn('Skip comment on person.', commentInput.person)
+					continue
+				}
 
-		for (const commentInput of commentInputs) {
-			if (!this._canCommentOnPerson(commentInput)) {
-				console.warn('Skip comment on person.', commentInput.person)
-				continue
-			}
+				const logText = `Commenting on ${commentInput.name ? `person ${commentInput.name}` : `face ${commentInput.faceId}`}`
+				console.info(`${logText}...`)
+				const speech = this._speech.speak(commentInput.comment)
+				const userData = JSON.parse(commentInput.person.userData) as UserData
 
-			const logText = `Commenting on ${commentInput.name ? `person ${commentInput.name}` : `face ${commentInput.faceId}`}`
-			console.info(`${logText}...`)
-			const speech = this._speech.speak(commentInput.comment)
+				const commentData: DeliverCommentData = {
+					imageDataUrl: commentInput.imageDataUrl,
+					name: userData.firstName,
+					personId: commentInput.person.personId,
+					speech,
+					when: new Date(),
+				}
 
-			const commentData: DeliverCommentData = {
-				imageDataUrl: commentInput.imageDataUrl,
-				name: commentInput.name,
-				personId: commentInput.person.personId,
-				speech,
-				when: new Date(),
+				this._commentHistory.set(commentInput.person.personId, commentData)
+				this._onSpeakDispatcher.dispatch(commentData)
+				await speech.completion
+				console.info(`${logText}...DONE`)
 			}
 
-			this._commentHistory.set(commentInput.person.personId, commentData)
-			this._onSpeakDispatcher.dispatch(commentData)
-			await speech.completion
-			console.info(`${logText}...DONE`)
-		}
-
-		this._onSpeakCompletedDispatcher.dispatch(undefined)
+			this._onSpeakCompletedDispatcher.dispatch(undefined)
+		} catch (err) {
+			console.error('Failed to deliver comments')
+	}
 
 		this.commentsDelivered()
 	}
