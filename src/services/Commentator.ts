@@ -237,7 +237,7 @@ export class Commentator {
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
-	private readonly _commentCooldownPerPerson = moment.duration(1, 'minutes')
+	private readonly _commentCooldownPerPerson = moment.duration(10, 'seconds')
 
 	/**
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
@@ -252,6 +252,12 @@ export class Commentator {
 	 */
 	private _facesToIdentify: DetectedFaceWithImageData[] = []
 	private _status: StatusInfo = { state: 'idle', text: 'Ikke startet enda', emoji: '😶' }
+	/**
+	 * Keep track of whether we have identified at least one face in the current presence.
+	 * This will be reset when presence is no longer detected.
+	 * TODO Refactor this to a separate state in the state machine.
+	 */
+	private _hasIdentifiedFacesInCurrentPresence = false
 
 	constructor(inputOpts: InputOpts) {
 		const defaultOpts: DefaultOpts = {
@@ -414,6 +420,10 @@ export class Commentator {
 
 			console.info(`Identified ${identifiedFaces.length}/${input.detectedFaces.length} faces.`)
 
+			if (identifiedFaces.length > 0) {
+				this._hasIdentifiedFacesInCurrentPresence = true
+			}
+
 			const anonymousPersons: IdentifiedPerson[] = await Promise.all(
 				unidentifiedFaces.map(async (faceWithImageData) => {
 					const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
@@ -545,6 +555,7 @@ export class Commentator {
 			console.info('User is no longer present, proceeding to not present state.')
 			// Can't transition while in transition
 			setTimeout(() => this.noPresenceDetected(), 0)
+			return
 		}
 
 		switch (lifecycle.from) {
@@ -562,6 +573,7 @@ export class Commentator {
 
 					// Can't transition while in transition
 					setTimeout(() => this._fsm.facesDetected(), 0)
+					return
 				}
 				break
 			}
@@ -574,7 +586,13 @@ export class Commentator {
 		this._facesToIdentify = []
 		console.info('Cleared faces detected buffer.')
 
-		this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
+		if (this._hasIdentifiedFacesInCurrentPresence) {
+			// Let's not spam status for the same person since this will
+			// typically happen a lot while the person is standing there,
+			// but we still want to detect any new faces that may have arrived
+		} else {
+			this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
+		}
 
 		// Do not await here to not block transition, will run in background
 		this._identifyFacesAsync(facesToIdentify)
@@ -614,6 +632,8 @@ export class Commentator {
 			this._setStatus('Forlatt og alene igjen...', '😟')
 			this._faceDetector.stop()
 		}
+
+		this._hasIdentifiedFacesInCurrentPresence = false
 	}
 
 	private _onIdle(lifecycle: Lifecycle) {
