@@ -28,6 +28,25 @@ const StateMachineHistory = require('javascript-state-machine/lib/history')
 // tslint:restore:variable-name
 
 //#region Helper functions
+declare global {
+  interface Array<T> {
+		/**
+		 * Returns the array with distinct/unique elements, optionally based on some property value.
+		 */
+    distinct<U>(map?: (el: T) => U): Array<T>
+  }
+}
+
+if (!Array.prototype.distinct) {
+  Array.prototype.distinct = function<T,U>(map?: (el: T) => U): T[] {
+		if (map) {
+		return this.filter((elem: T, pos: number, arr: T[]) => arr.map(map).indexOf(map(elem)) === pos)
+		} else {
+			return this.filter((elem: T, pos: number, arr: T[]) => arr.indexOf(elem) === pos)
+		}
+  }
+}
+
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
 function contains(arr: any[], predicate: (item: any, idx: number) => boolean) {
@@ -54,6 +73,7 @@ const Transition = strEnum([
 	'commentsDelivered',
 	'detectFacesFailedByThrottling',
 	'identifyFacesFailedByThrottling',
+	'waitForThrottlingCompleted'
 ])
 type Transition = keyof typeof Transition
 
@@ -82,6 +102,7 @@ interface MyStateMachine {
 	commentsDelivered(): void
 	detectFacesFailedByThrottling(): void
 	identifyFacesFailedByThrottling(): void
+	waitForThrottlingCompleted(): void
 
 	// Methods
 	can(transition: Transition): boolean
@@ -197,6 +218,7 @@ export const State = strEnum([
 	'detectFaces',
 	'identifyFaces',
 	'deliverComments',
+	'waitForThrottling'
 ])
 export type State = keyof typeof State
 
@@ -279,12 +301,15 @@ export class Commentator {
 		const opts: CommentatorOptions = { ...{}, ...defaultOpts, ...inputOpts }
 
 		// Bind methods
+		this._enqueue = this._enqueue.bind(this)
+		this._enqueueAction = this._enqueueAction.bind(this)
 		this._onEnterDeliverComments = this._onEnterDeliverComments.bind(this)
 		this._onEnterDetectFaces = this._onEnterDetectFaces.bind(this)
 		this._onEnterDetectPresence = this._onEnterDetectPresence.bind(this)
 		this._onEnterIdentifyFaces = this._onEnterIdentifyFaces.bind(this)
 		this._onEnterIdle = this._onEnterIdle.bind(this)
 		this._onPeriodicDetectFacesAsync = this._onPeriodicDetectFacesAsync.bind(this)
+		this._onEnterWaitForThrottling = this._onEnterWaitForThrottling.bind(this)
 
 		this._commentProvider = opts.commentProvider
 		this._faceApi = opts.faceApi
@@ -317,15 +342,30 @@ export class Commentator {
 				{ from: 'detectFaces', name    : 'facesDetected', to     : 'identifyFaces' },
 				{ from: 'detectFaces', name    : 'noPresenceDetected', to: 'detectPresence' },
 				{ from: 'detectFaces', name    : 'presenceDetected',   to: '' },
+				{ from: 'detectFaces', name    : 'detectFacesFailedByThrottling', to: 'waitForThrottling' },
+				{ from: 'detectFaces', name    : 'identifyFacesFailedByThrottling', to: 'waitForThrottling' },
 
 				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
 				{ from: 'identifyFaces', name  : 'noFacesToIdentify',  to: 'detectFaces' },
+				{ from: 'identifyFaces', name  : 'identifyFacesFailedByThrottling', to: 'waitForThrottling' },
 				{ from: 'identifyFaces', name  : 'presenceDetected',   to: '' },
 				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: '' },
+				{ from: 'identifyFaces', name  : 'detectFacesFailedByThrottling', to: '' },
 
 				{ from: 'deliverComments', name: 'commentsDelivered', to : 'detectFaces' },
 				{ from: 'deliverComments', name: 'presenceDetected',   to: '' },
 				{ from: 'deliverComments', name: 'noPresenceDetected', to: '' },
+
+				// Ignore all but waitForThrottlingCompleted and stop (declared by wildcard above)
+				{ from: 'waitForThrottling', name  : 'waitForThrottlingCompleted', to: 'detectFaces' },
+				{ from: 'waitForThrottling', name  : 'presenceDetected', to: '' },
+				{ from: 'waitForThrottling', name  : 'noPresenceDetected', to: '' },
+				{ from: 'waitForThrottling', name  : 'facesDetected', to: '' },
+				{ from: 'waitForThrottling', name  : 'noFacesToIdentify', to: '' },
+				{ from: 'waitForThrottling', name  : 'detectFacesFailedByThrottling', to: '' },
+				{ from: 'waitForThrottling', name  : 'facesIdentified', to: '' },
+				{ from: 'waitForThrottling', name  : 'identifyFacesFailedByThrottling', to: '' },
+				{ from: 'waitForThrottling', name  : 'commentsDelivered', to: '' },
 			],
 		}
 
@@ -354,11 +394,12 @@ export class Commentator {
 
 		fsm.observe({
 			// States
-			onDeliverComments: this._onEnterDeliverComments,
-			onDetectFaces: this._onEnterDetectFaces,
-			onDetectPresence: this._onEnterDetectPresence,
-			onIdentifyFaces: this._onEnterIdentifyFaces,
 			onIdle: this._onEnterIdle,
+			onDetectPresence: this._onEnterDetectPresence,
+			onDetectFaces: this._onEnterDetectFaces,
+			onIdentifyFaces: this._onEnterIdentifyFaces,
+			onDeliverComments: this._onEnterDeliverComments,
+			onWaitForThrottling: this._onEnterWaitForThrottling,
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
 				console.info(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 				this._onTransitionDispacher.dispatch(lifecycle)
@@ -505,13 +546,22 @@ export class Commentator {
 		this._commentOnFacesAndPersonsAsync(input)
 	}
 
+	private _onEnterWaitForThrottling(lifecycle: Lifecycle) {
+		console.info('Wait 5 seconds for throttling...')
+		setTimeout(() => {
+			console.info('Wait 5 seconds for throttling...DONE.')
+			this._fsm.waitForThrottlingCompleted()
+		}, 5000)
+	}
+
 	//#region Actions
 	private async _commentOnFacesAndPersonsAsync(input: FacesIdentifiedPayload): Promise<void> {
 		try {
 			const CONFIDENT = 0.5
 
 			const identifiedFaces = input.identifiedFaces
-				.filter(x => x.candidates.filter(c => c.confidence >= CONFIDENT).length > 0)
+				.filter(x => x.candidates.filter(c => c.confidence >= CONFIDENT).length > 0) // At least one good match
+				.distinct(x => x.candidates[0].personId) // Do not return multiple of same person
 
 			const unidentifiedFaces = input.detectedFaces
 				.filter(detectedFace => !identifiedFaces.map(x => x.faceId).includes(detectedFace.faceId))
@@ -524,6 +574,7 @@ export class Commentator {
 
 			const anonymousPersons: IdentifiedPerson[] = await Promise.all(
 				unidentifiedFaces.map(async (faceWithImageData) => {
+					console.info(`Create anonymous person for face [${faceWithImageData.faceId}].`)
 					const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
 					return {
 						confidence: 1,
@@ -532,8 +583,6 @@ export class Commentator {
 						personId: anonymousPerson.personId,
 					}
 				}))
-
-			console.info(`Created ${anonymousPersons.length} anonymous persons.`)
 
 			console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
 
@@ -622,6 +671,11 @@ export class Commentator {
 
 			this._onSpeakCompletedDispatcher.dispatch(undefined)
 		} catch (err) {
+			if (err instanceof ThrottledHttpError) {
+				console.warn(`Identification was throttled, adding back ${input.detectedFaces.length} faces to retry later.`)
+				this._facesToIdentify.push(...input.detectedFaces)
+				this._fsm.identifyFacesFailedByThrottling()
+			}
 			console.error('Failed to deliver comments')
 	}
 
@@ -647,6 +701,10 @@ export class Commentator {
 				identifiedFaces: identifyFacesResponse,
 			})
 		} catch (err) {
+			if (err instanceof ThrottledHttpError) {
+				console.warn('Identify faces was throttled, adding back faces for retry later.')
+				this._facesToIdentify.push(...facesToIdentify)
+			}
 			console.error('Failed to identify faces.', error(err))
 			this.error()
 		}
@@ -668,8 +726,10 @@ export class Commentator {
 		} catch (err) {
 			if (err instanceof ThrottledHttpError) {
 				this._fsm.detectFacesFailedByThrottling()
-				return
 			}
+
+			// Let periodic face detector deal with error
+			throw err
 		}
 	}
 

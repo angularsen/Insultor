@@ -196,7 +196,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 	/** @inheritdoc */
 	public async identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse> {
-		if (faceIds.length < 1) { throw new Error('Expected between 1 and 10 face IDs, got ' + faceIds.length) }
+		if (faceIds.length < 1 || faceIds.length > 10) { throw new Error('Expected between 1 and 10 face IDs, got ' + faceIds.length) }
 
 		console.log(`MicrosoftFaceApi: Identify ${faceIds.length} faces with Microsoft Face API.`)
 
@@ -219,7 +219,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			await ensureSuccessAsync(res)
 
 			const identifiedFaces: IdentifyFacesResponse = await res.json()
-			if (identifiedFaces.length > 0) {
+			if (identifiedFaces.length === 0) {
 				console.log(`MicrosoftFaceApi: No faces were identified.`)
 			} else {
 				console.info(`MicrosoftFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
