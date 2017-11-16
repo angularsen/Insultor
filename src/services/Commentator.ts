@@ -20,6 +20,12 @@ import { error } from './utils/format'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
 
+// tslint:disable:variable-name
+const StateMachine = require('javascript-state-machine')
+const StateMachineHistory = require('javascript-state-machine/lib/history')
+// tslint:restore:variable-name
+
+//#region Helper functions
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
 
 function contains(arr: any[], predicate: (item: any, idx: number) => boolean) {
@@ -30,13 +36,9 @@ function last(arr: any[]) {
 	const [lastItem] = arr.slice(-1)
 	return lastItem
 }
+//#endregion Helper functions
 
-// tslint:disable:max-classes-per-file
-// tslint:disable-next-line:variable-name
-const StateMachine = require('javascript-state-machine')
-// tslint:disable:no-submodule-imports
-// tslint:disable-next-line:variable-name
-const StateMachineHistory = require('javascript-state-machine/lib/history')
+//#region Internal types
 
 // tslint:disable-next-line:variable-name
 const Action = strEnum([
@@ -49,16 +51,6 @@ const Action = strEnum([
 	'commentsDelivered',
 ])
 type Action = keyof typeof Action
-
-// tslint:disable-next-line:variable-name
-export const State = strEnum([
-	'idle',
-	'detectPresence',
-	'detectFaces',
-	'identifyFaces',
-	'deliverComments',
-])
-export type State = keyof typeof State
 
 type MyEventCaller = (...args: any[]) => void
 
@@ -78,7 +70,8 @@ interface MyStateMachine {
 	onTransition: (lifecycle: Lifecycle, ...args: any[]) => void
 
 	// Methods
-	can: (transition: Action) => boolean
+	can(transition: Action): boolean
+	fire(transition: Action, ...args: any[]): void
 	observe: {
 		(event: string, callback: (lifecycle: Lifecycle, ...args: any[]) => void): void,
 		(events: object): void,
@@ -126,12 +119,6 @@ interface MyTransition {
 	name: Action
 	from: '*' | State | State[]
 	to: State | '' // empty for ignore
-}
-
-export interface Lifecycle {
-	transition: string
-	from: State
-	to: State
 }
 
 // To avoid filling out entire object for the sake of a test
@@ -187,6 +174,39 @@ interface CommentatorOptions {
 	videoService: IVideoService
 }
 
+interface DeliverCommentInput {
+	/** The comment text to deliver */
+	comment: string
+	/** The detected face ID */
+	faceId: string
+	/** URL encoded data of image that detected the face  */
+	imageDataUrl: string
+	/** The name of the person */
+	name: string
+	/** Info about person. */
+	person: Person
+}
+
+//#endregion Internal types
+
+//#region Exported types
+
+// tslint:disable-next-line:variable-name
+export const State = strEnum([
+	'idle',
+	'detectPresence',
+	'detectFaces',
+	'identifyFaces',
+	'deliverComments',
+])
+export type State = keyof typeof State
+
+export interface Lifecycle {
+	transition: string
+	from: State
+	to: State
+}
+
 export interface StatusInfo {
 	emoji: string
 	state: State
@@ -205,19 +225,7 @@ export interface DeliverCommentData {
 	/** When comment was delivered, in order to throttle and avoid spam of certain persons. */
 	when: Date
 }
-
-interface DeliverCommentInput {
-	/** The comment text to deliver */
-	comment: string
-	/** The detected face ID */
-	faceId: string
-	/** URL encoded data of image that detected the face  */
-	imageDataUrl: string
-	/** The name of the person */
-	name: string
-	/** Info about person. */
-	person: Person
-}
+//#endregion Exported types
 
 export class Commentator {
 	public get onSpeakCompleted(): IEvent<void> { return this._onSpeakCompletedDispatcher }
@@ -251,7 +259,10 @@ export class Commentator {
 	 * on a previous faces, which can take several seconds.
 	 */
 	private _facesToIdentify: DetectedFaceWithImageData[] = []
+
+	/** Current status, to present to user.  */
 	private _status: StatusInfo = { state: 'idle', text: 'Ikke startet enda', emoji: '😶' }
+
 	/**
 	 * Keep track of whether we have identified at least one face in the current presence.
 	 * This will be reset when presence is no longer detected.
@@ -269,13 +280,12 @@ export class Commentator {
 		const opts: CommentatorOptions = { ...{}, ...defaultOpts, ...inputOpts }
 
 		// Bind methods
-		this._onDeliverComments = this._onDeliverComments.bind(this)
-		this._onDetectFaces = this._onDetectFaces.bind(this)
-		this._onDetectPresence = this._onDetectPresence.bind(this)
-		this._onIdentifyFaces = this._onIdentifyFaces.bind(this)
-		this._onIdle = this._onIdle.bind(this)
+		this._onEnterDeliverComments = this._onEnterDeliverComments.bind(this)
+		this._onEnterDetectFaces = this._onEnterDetectFaces.bind(this)
+		this._onEnterDetectPresence = this._onEnterDetectPresence.bind(this)
+		this._onEnterIdentifyFaces = this._onEnterIdentifyFaces.bind(this)
+		this._onEnterIdle = this._onEnterIdle.bind(this)
 		this._onPeriodicDetectFacesAsync = this._onPeriodicDetectFacesAsync.bind(this)
-		this._setStatus = this._setStatus.bind(this)
 
 		this._commentProvider = opts.commentProvider
 		this._faceApi = opts.faceApi
@@ -340,11 +350,11 @@ export class Commentator {
 
 		fsm.observe({
 			// States
-			onDeliverComments: this._onDeliverComments,
-			onDetectFaces: this._onDetectFaces,
-			onDetectPresence: this._onDetectPresence,
-			onIdentifyFaces: this._onIdentifyFaces,
-			onIdle: this._onIdle,
+			onDeliverComments: this._onEnterDeliverComments,
+			onDetectFaces: this._onEnterDetectFaces,
+			onDetectPresence: this._onEnterDetectPresence,
+			onIdentifyFaces: this._onEnterIdentifyFaces,
+			onIdle: this._onEnterIdle,
 			onTransition: (lifecycle: Lifecycle, ...args: any[]) => {
 				console.info(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 				this._onTransitionDispacher.dispatch(lifecycle)
@@ -361,6 +371,17 @@ export class Commentator {
 	public start = () => this._fsm.start()
 	public stop = () => this._fsm.stop()
 
+	/**
+	 * Enqueue a transition to happen as soon as the javascript politely defers its execution control,
+	 * such as when returning from a callback method or awaiting a promise.
+	 * This is useful when reacting to state machine lifecycle events, since you can't
+	 * enter a transition when already in a transition.
+	 * The transition is enqueued by using setTimeout() with 0 ms delay.
+	 * */
+	public enqueueTransition(action: Action, ...args: any[]): void {
+		setTimeout(() => this._fsm.fire(action), args)
+
+	}
 	public toggleStartStop() {
 		if (this._fsm.can('start')) {
 			this.start()
@@ -401,14 +422,89 @@ export class Commentator {
 	}
 
 	// State handlers
-	private _onDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
+	private _onEnterIdle(lifecycle: Lifecycle) {
+		console.info('_onIdle')
+
+		this._setStatus('Zzzz...', '😴')
+		this._presenceDetector.stop()
+		this._videoService.stop()
+		this._faceDetector.stop()
+	}
+
+	private _onEnterDetectPresence(lifecycle: Lifecycle) {
+		console.info('_onDetectPresence')
+		if (lifecycle.from === 'idle') {
+			this._setStatus('Hei.. er det noen her?', '🙂')
+			this._videoService.start()
+			this._presenceDetector.start(200)
+			this._facesToIdentify = [] // clear buffer
+		} else {
+			this._setStatus('Forlatt og alene igjen...', '😟')
+			this._faceDetector.stop()
+		}
+
+		this._hasIdentifiedFacesInCurrentPresence = false
+	}
+
+	private _onEnterDetectFaces(lifecycle: Lifecycle) {
+		console.info('_onDetectFaces')
+
+		if (!this._presenceDetector.isDetected) {
+			console.info('User is no longer present, proceeding to not present state.')
+			this.enqueueTransition('noPresenceDetected')
+			return
+		}
+
+		switch (lifecycle.from) {
+			case 'detectPresence': {
+				console.info('Presence was just detected, proceeding to attempt to detect faces.')
+				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
+				this._faceDetector.start()
+				break
+			}
+			case 'deliverComments': {
+				if (this._facesToIdentify.length > 0) {
+					console.info(`${this._facesToIdentify.length} faces were detected in the meantime, immediately start identifying them.`)
+					this.enqueueTransition('facesDetected')
+					return
+				}
+				console.info('User is still present after delivering comments, continue to detect faces in the background.')
+				this._setStatus('Du er her fortsatt ja...', '😑')
+				break;
+			}
+			default: {
+				break
+			}
+		}
+	}
+
+	private _onEnterIdentifyFaces(lifecycle: Lifecycle) {
+		// Create a copy then clear buffer
+		const facesToIdentify = this._facesToIdentify.slice()
+		this._facesToIdentify = []
+		console.info('Cleared faces detected buffer.')
+
+		if (this._hasIdentifiedFacesInCurrentPresence) {
+			// Let's not spam status for the same person since this will
+			// typically happen a lot while the person is standing there,
+			// but we still want to detect any new faces that may have arrived
+		} else {
+			this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
+		}
+
+		// Do not await here to not block transition, will run in background
+		this._identifyFacesAsync(facesToIdentify)
+	}
+
+	private _onEnterDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
 		console.info('onDeliverComments')
 		this._setStatus('Hør nå her', '😎')
 		// Do not await here to not block state transition
-		this._deliverCommentsAsync(input)
+		this._commentOnFacesAndPersonsAsync(input)
 	}
 
-	private async _deliverCommentsAsync(input: FacesIdentifiedPayload): Promise<void> {
+	//#region Actions
+	private async _commentOnFacesAndPersonsAsync(input: FacesIdentifiedPayload): Promise<void> {
 		try {
 			const CONFIDENT = 0.5
 
@@ -530,74 +626,6 @@ export class Commentator {
 		this.commentsDelivered()
 	}
 
-	private _canCommentOnPerson(commentInput: DeliverCommentInput): boolean {
-		const prevComment = this._commentHistory.get(commentInput.person.personId)
-		if (!prevComment) {
-			console.debug('OK, no previous comment.')
-			return true
-		}
-
-		const timeSinceLast = moment.duration(moment().diff(prevComment.when))
-		if (timeSinceLast > this._commentCooldownPerPerson) {
-			console.debug('OK, long enough since previous comment.', timeSinceLast)
-			return true
-		}
-
-		const waitTimeText = this._commentCooldownPerPerson.subtract(timeSinceLast).humanize()
-		console.info(`Too early to comment on person ${commentInput.name}, need to wait at least ${waitTimeText}.`)
-		return false
-	}
-
-	private _onDetectFaces(lifecycle: Lifecycle) {
-		console.info('_onDetectFaces')
-
-		if (!this._presenceDetector.isDetected) {
-			console.info('User is no longer present, proceeding to not present state.')
-			// Can't transition while in transition
-			setTimeout(() => this.noPresenceDetected(), 0)
-			return
-		}
-
-		switch (lifecycle.from) {
-			case 'detectPresence': {
-				this._faceDetector.start()
-				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
-				break
-			}
-			case 'deliverComments': {
-				this._setStatus('Du er her fortsatt ja...', '😑')
-			}
-			default: {
-				if (this._facesToIdentify.length > 0) {
-					console.info(`${this._facesToIdentify.length} faces were detected in the meantime, identifying...`)
-
-					// Can't transition while in transition
-					setTimeout(() => this._fsm.facesDetected(), 0)
-					return
-				}
-				break
-			}
-		}
-	}
-
-	private _onIdentifyFaces(lifecycle: Lifecycle) {
-		// Create a copy then clear buffer
-		const facesToIdentify = this._facesToIdentify.slice()
-		this._facesToIdentify = []
-		console.info('Cleared faces detected buffer.')
-
-		if (this._hasIdentifiedFacesInCurrentPresence) {
-			// Let's not spam status for the same person since this will
-			// typically happen a lot while the person is standing there,
-			// but we still want to detect any new faces that may have arrived
-		} else {
-			this._setStatus('Det er noe kjent med deg, la meg sjekke opp litt!', '🤗')
-		}
-
-		// Do not await here to not block transition, will run in background
-		this._identifyFacesAsync(facesToIdentify)
-	}
-
 	private async _identifyFacesAsync(facesToIdentify: DetectedFaceWithImageData[]): Promise<void> {
 		console.info('_onIdentifyFacesAsync')
 		try {
@@ -621,30 +649,6 @@ export class Commentator {
 		}
 	}
 
-	private _onDetectPresence(lifecycle: Lifecycle) {
-		console.info('_onDetectPresence')
-		if (lifecycle.from === 'idle') {
-			this._setStatus('Hei.. er det noen her?', '🙂')
-			this._videoService.start()
-			this._presenceDetector.start(200)
-			this._facesToIdentify = [] // clear buffer
-		} else {
-			this._setStatus('Forlatt og alene igjen...', '😟')
-			this._faceDetector.stop()
-		}
-
-		this._hasIdentifiedFacesInCurrentPresence = false
-	}
-
-	private _onIdle(lifecycle: Lifecycle) {
-		console.info('_onIdle')
-
-		this._setStatus('Zzzz...', '😴')
-		this._presenceDetector.stop()
-		this._videoService.stop()
-		this._faceDetector.stop()
-	}
-
 	private async _onPeriodicDetectFacesAsync(): Promise<DetectedFaceWithImageData[]> {
 		console.debug(`On periodically detect faces...`)
 		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
@@ -663,6 +667,28 @@ export class Commentator {
 		this._status = { state: this.state, text, emoji }
 		this._onStatusChangedDispatcher.dispatch(this._status)
 	}
+	//#endregion Actions
+
+	//#region Helpers
+	private _canCommentOnPerson(commentInput: DeliverCommentInput): boolean {
+		const prevComment = this._commentHistory.get(commentInput.person.personId)
+		if (!prevComment) {
+			console.debug('OK, no previous comment.')
+			return true
+		}
+
+		const timeSinceLast = moment.duration(moment().diff(prevComment.when))
+		if (timeSinceLast > this._commentCooldownPerPerson) {
+			console.debug('OK, long enough since previous comment.', timeSinceLast)
+			return true
+		}
+
+		const waitTimeText = this._commentCooldownPerPerson.subtract(timeSinceLast).humanize()
+		console.info(`Too early to comment on person ${commentInput.name}, need to wait at least ${waitTimeText}.`)
+		return false
+	}
+
+	//#endregion
 }
 
 export default Commentator
