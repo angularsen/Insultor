@@ -336,6 +336,12 @@ export class Commentator {
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
 				{ from: 'idle', name           : 'presenceDetected', to  : '' }, // Ignore late events after stopping
 				{ from: 'idle', name           : 'noPresenceDetected', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'facesDetected', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'facesIdentified', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'noFacesToIdentify', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'commentsDelivered', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'detectFacesFailedByThrottling', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'identifyFacesFailedByThrottling', to: '' }, // Ignore late events after stopping
 
 				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
 

@@ -69,7 +69,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/persistedFaces`
-		const headers = this._getDefaultHeaders()
+		const headers = this._getDefaultHeaders('application/octet-stream')
+
 		const body = this._createBlob(imageDataUrl)
 
 		try {
@@ -91,7 +92,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons`
-		const headers = this._getDefaultHeaders()
+		const headers = this._getDefaultHeaders('application/json')
 
 		const body = {
 			name,
@@ -147,9 +148,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'POST'
 		const url = `${this._endpoint}detect?returnFaceId=true&returnFaceAttributes=${FACE_ATTRIBUTES}&returnFaceLandmarks=false`
-		const headers = new Headers()
-		headers.append('Content-Type', 'application/octet-stream')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders('application/octet-stream')
 
 		const body = this._createBlob(imageDataUrl)
 
@@ -176,10 +175,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons`
-		const headers = new Headers()
-		headers.append('Accept', 'application/json')
-		headers.append('Content-Type', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders()
 
 		try {
 			const res = await fetch(url, { method, headers })
@@ -202,10 +198,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'POST'
 		const url = `${this._endpoint}identify`
-		const headers = new Headers()
-		headers.append('Accept', 'application/json')
-		headers.append('Content-Type', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders('application/json')
 
 		const body = JSON.stringify({
 			faceIds,
@@ -222,7 +215,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			if (identifiedFaces.length === 0) {
 				console.log(`MicrosoftFaceApi: No faces were identified.`)
 			} else {
-				console.info(`MicrosoftFaceApi: Detected ${identifiedFaces.length} faces.`, identifiedFaces)
+				console.info(`MicrosoftFaceApi: Identified ${identifiedFaces.length} faces.`, identifiedFaces)
 			}
 			return identifiedFaces
 		} catch (err) {
@@ -237,9 +230,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}`
-		const headers = new Headers()
-		headers.append('Accept', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders()
 
 		try {
 			const res = await fetch(url, { method, headers })
@@ -255,9 +246,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	public async trainPersonGroup(): Promise<void> {
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/train`
-		const headers = new Headers()
-		headers.append('Accept', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders()
 
 		try {
 			const res = await fetch(url, { method, headers })
@@ -272,9 +261,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	public async getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/training`
-		const headers = new Headers()
-		headers.append('Accept', 'application/json')
-		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		const headers = this._getDefaultHeaders()
 
 		try {
 			const res = await fetch(url, { method, headers })
@@ -310,10 +297,13 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		}
 	}
 
-	private _getDefaultHeaders() {
+	private _getDefaultHeaders(contentType?: string) {
 		const headers = new Headers()
-		headers.append('Content-Type', 'application/octet-stream')
 		headers.append('Ocp-Apim-Subscription-Key', this._subscriptionKey)
+		headers.append('Accept', 'application/json')
+		if (contentType) {
+			headers.append('Content-Type', contentType)
+		}
 		return headers
 	}
 

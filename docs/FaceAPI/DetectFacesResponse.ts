@@ -177,10 +177,20 @@ export interface FacialHair {
 }
 
 export interface FaceAttributes {
+	accessories: Accessory[]
 	age: number
-	gender: string
-	smile: number
+	blur: Blur
+	emotion: Emotion
+	exposure: Exposure
 	facialHair: FacialHair
+	gender: string
+	glasses: GlassType
+	headPose: HeadPose
+	smile: number
+	hair: Hair
+	makeup: Makeup
+	noise: Noise
+	occlusion: Occlusion
 }
 
 export interface HeadPose {
@@ -249,16 +259,6 @@ export interface DetectFaceResult {
 	faceRectangle: FaceRectangle
 	faceLandmarks: FaceLandmarks
 	faceAttributes: FaceAttributes
-	glasses: GlassType
-	headPose: HeadPose
-	emotion: Emotion
-	hair: Hair
-	makeup: Makeup
-	occlusion: Occlusion
-	accessories: Accessory[]
-	blur: Blur
-	exposure: Exposure
-	noise: Noise
 }
 
 /**
