@@ -12,7 +12,7 @@ import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
 import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { FakeSpeech } from './fakes/FakeSpeech'
 import { FakeVideoService } from './fakes/FakeVideoService'
-import { IMicrosoftFaceApi, HttpError, ThrottledHttpError } from './MicrosoftFaceApi'
+import { HttpError, IMicrosoftFaceApi, ThrottledHttpError } from './MicrosoftFaceApi'
 import { DetectedFaceWithImageData, IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
 import { ISpeech, SpeakData } from './Speech'
@@ -52,8 +52,8 @@ const Transition = strEnum([
 	'facesIdentified',
 	'noFacesToIdentify',
 	'commentsDelivered',
-	'detectFacesFailedDueToThrottling',
-	'identifyFacesFailedDueToThrottling',
+	'detectFacesFailedByThrottling',
+	'identifyFacesFailedByThrottling',
 ])
 type Transition = keyof typeof Transition
 
@@ -80,8 +80,8 @@ interface MyStateMachine {
 	noFacesToIdentify(): void
 	facesIdentified(input: FacesIdentifiedPayload): void
 	commentsDelivered(): void
-	detectFacesFailedDueToThrottling(): void
-	identifyFacesFailedDueToThrottling(): void
+	detectFacesFailedByThrottling(): void
+	identifyFacesFailedByThrottling(): void
 
 	// Methods
 	can(transition: Transition): boolean
@@ -370,7 +370,7 @@ export class Commentator {
 	get history(): State[] { return this._fsm.history }
 
 	// Proxy methods for strongly typed args
-	public error(): void { this._fsm.error() }
+	public error(): void { this._fsm.detectFacesFailedByThrottling() }
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
 	public start = () => this._fsm.start()
@@ -667,7 +667,8 @@ export class Commentator {
 			}))
 		} catch (err) {
 			if (err instanceof ThrottledHttpError) {
-				this._fsm.detectFacesFailedDueToThrottling()
+				this._fsm.detectFacesFailedByThrottling()
+				return
 			}
 		}
 	}
