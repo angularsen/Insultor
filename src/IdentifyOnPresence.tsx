@@ -227,6 +227,7 @@ class Component extends React.Component<any, State> {
 			<div>
 					<div style={{ textAlign: 'center', fontSize: 49/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
 					<div style={{ textAlign: 'center', fontSize: '2em' }}><span>{commentData.name}</span></div>
+					<div style={{ textAlign: 'center', fontSize: '1.2em' }}><span>{commentData.speech.utterance.text}</span></div>
 					<div style={{ textAlign: 'center' }}><img src={commentData.imageDataUrl} style={{ width: 400 }} /></div>
 			</div>
 				) : (
@@ -278,7 +279,7 @@ class Component extends React.Component<any, State> {
 	private videoOnCanPlay(ev: React.SyntheticEvent<HTMLVideoElement>) {
 		const video: HTMLVideoElement = ev.target as HTMLVideoElement
 
-		console.log('IdentifyOnPresence: Video ready to play. Calculating output height.')
+		console.log('IdentifyOnPresence: Video ready to play.')
 
 		// Scale height to achieve same aspect ratio for whatever our rendered width is
 		// const height = video.videoHeight / (video.videoWidth / this.state.width)

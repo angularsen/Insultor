@@ -1,3 +1,5 @@
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
+
 // On free plan (~3 seconds between requests)
 // const REQUESTS_PER_MINUTE_MAX = 20;
 const REPEAT_MS_DEFAULT = 3200; // Slightly above throttle limit

@@ -1,6 +1,7 @@
 import * as moment from 'moment'
 type Moment = moment.Moment
 
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import {isDefined } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'

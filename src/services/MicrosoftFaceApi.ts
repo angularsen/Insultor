@@ -12,10 +12,10 @@ async function ensureSuccessAsync(res: Response) {
 	if (!res.ok) {
 		switch (res.status) {
 			case 429: {
-				throw new HttpError('Rate limit exceeded.', res, (res && await res.json()))
+				throw new ThrottledHttpError('Rate limit exceeded.', res)
 			}
 			default: {
-				throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res, (res && await res.json()))
+				throw new HttpError(`Request failed with status ${res.status} ${res.statusText}`, res)
 			}
 		}
 	}
@@ -320,9 +320,21 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 }
 
 // tslint:disable-next-line:max-classes-per-file
-class HttpError extends Error {
-	constructor(public msg: string, public response: Response, public responseBody: string) {
+export class HttpError extends Error {
+	public readonly body: Promise<any>
+	constructor(public msg: string, public response: Response) {
 		super(msg)
+		this.body = response.json()
+	}
+
+	public get statusCode() { return this.response.status }
+}
+
+// tslint:disable-next-line:max-classes-per-file
+export class ThrottledHttpError extends HttpError {
+	constructor(public msg: string, public response: Response) {
+		super(msg, response)
+		if (response.status !== 429) { throw new Error('Expected status code 429 for a throttled error.') }
 	}
 }
 

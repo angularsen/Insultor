@@ -1,3 +1,4 @@
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { ISpeech, ISpeechOpts, SpeakData } from '../Speech'
 
 export class FakeSpeech implements ISpeech {

@@ -1,6 +1,7 @@
 import * as moment from 'moment'
 type Moment = moment.Moment
 
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import Person, { UserData } from '../../docs/FaceAPI/Person'
@@ -11,7 +12,7 @@ import { FakeMicrosoftFaceApi } from './fakes/FakeMicrosoftFaceApi'
 import { FakePresenceDetector } from './fakes/FakePresenceDetector'
 import { FakeSpeech } from './fakes/FakeSpeech'
 import { FakeVideoService } from './fakes/FakeVideoService'
-import { IMicrosoftFaceApi } from './MicrosoftFaceApi'
+import { IMicrosoftFaceApi, HttpError, ThrottledHttpError } from './MicrosoftFaceApi'
 import { DetectedFaceWithImageData, IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
 import { ISpeech, SpeakData } from './Speech'
@@ -22,6 +23,7 @@ import { IVideoService } from './VideoService'
 
 // tslint:disable:variable-name
 const StateMachine = require('javascript-state-machine')
+// tslint:disable-next-line:no-submodule-imports
 const StateMachineHistory = require('javascript-state-machine/lib/history')
 // tslint:restore:variable-name
 
@@ -41,41 +43,49 @@ function last(arr: any[]) {
 //#region Internal types
 
 // tslint:disable-next-line:variable-name
-const Action = strEnum([
+const Transition = strEnum([
 	'start',
 	'stop',
 	'presenceDetected',
 	'noPresenceDetected',
 	'facesDetected',
 	'facesIdentified',
+	'noFacesToIdentify',
 	'commentsDelivered',
+	'detectFacesFailedDueToThrottling',
+	'identifyFacesFailedDueToThrottling',
 ])
-type Action = keyof typeof Action
+type Transition = keyof typeof Transition
 
 type MyEventCaller = (...args: any[]) => void
 
 interface MyStateMachine {
-	// Transitions
-	commentsDelivered: MyEventCaller
-	start: MyEventCaller
-	stop: MyEventCaller
-	presenceDetected: MyEventCaller
-	noPresenceDetected: MyEventCaller
-	facesDetected: () => void
-	facesIdentified: (input: FacesIdentifiedPayload) => void
-
 	// Props
 	history: State[]
 	state: State
 	onTransition: (lifecycle: Lifecycle, ...args: any[]) => void
 
-	// Methods
-	can(transition: Action): boolean
-	fire(transition: Action, ...args: any[]): void
+	// Method with multiple signatures
 	observe: {
 		(event: string, callback: (lifecycle: Lifecycle, ...args: any[]) => void): void,
 		(events: object): void,
 	}
+
+	// Transitions
+	start(): void
+	stop(): void
+	presenceDetected(): void
+	noPresenceDetected(): void
+	facesDetected(): void
+	noFacesToIdentify(): void
+	facesIdentified(input: FacesIdentifiedPayload): void
+	commentsDelivered(): void
+	detectFacesFailedDueToThrottling(): void
+	identifyFacesFailedDueToThrottling(): void
+
+	// Methods
+	can(transition: Transition): boolean
+	fire(transition: Transition, ...args: any[]): void
 }
 
 interface FacesDetectedPayload {
@@ -95,28 +105,17 @@ interface FacesIdentifiedPayload {
 }
 
 interface MyConfig {
-	init?: State | { state: State, event: Action, defer: boolean }
+	init?: State | { state: State, event: Transition, defer: boolean }
 	plugins: any[]
-	// callbacks?: {
-	// 	[s: string]: (event?: Action, from?: State, to?: State, ...args: any[]) => any,
-	// }
 	methods?: {
 		onInvalidTransition: (transition: string, from: State, to: State) => void,
 		onPendingTransition: (transition: string, from: State, to: State) => void,
-		// 	onIdle?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onStart?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onStop?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onDetectPresence?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onLeaveDetectFaces?: (lifecycle: Lifecycle, ...args: any[]) => void,
-		// 	onIdentifyFaces?: (lifecycle: Lifecycle, input: IdentifyFacesInput) => void,
-		// 	onDeliverComments?: (lifecycle: Lifecycle, input: DeliverCommentsInput) => void,
 	}
 	transitions?: MyTransition[]
 }
 
 interface MyTransition {
-	name: Action
+	name: Transition
 	from: '*' | State | State[]
 	to: State | '' // empty for ignore
 }
@@ -310,6 +309,9 @@ export class Commentator {
 			transitions: [
 				{ from: '*', name              : 'stop', to              : 'idle' },
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
+				{ from: 'idle', name           : 'presenceDetected', to  : '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'noPresenceDetected', to: '' }, // Ignore late events after stopping
+
 				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
 
 				{ from: 'detectFaces', name    : 'facesDetected', to     : 'identifyFaces' },
@@ -317,6 +319,7 @@ export class Commentator {
 				{ from: 'detectFaces', name    : 'presenceDetected',   to: '' },
 
 				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
+				{ from: 'identifyFaces', name  : 'noFacesToIdentify',  to: 'detectFaces' },
 				{ from: 'identifyFaces', name  : 'presenceDetected',   to: '' },
 				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: '' },
 
@@ -340,9 +343,10 @@ export class Commentator {
 			}
 		})
 
-		this._faceDetector.facesDetected.subscribe((result: DetectedFaceWithImageData[]) => {
+		this._faceDetector.facesDetected.subscribe((detectedFaces: DetectedFaceWithImageData[]) => {
 			try {
-				this.facesDetected({ detectedFaces: result })
+				this._facesToIdentify.push(...detectedFaces)
+				this.facesDetected()
 			} catch (err) {
 				console.error('Failed to handle detected faces.', error(err))
 			}
@@ -366,22 +370,12 @@ export class Commentator {
 	get history(): State[] { return this._fsm.history }
 
 	// Proxy methods for strongly typed args
+	public error(): void { this._fsm.error() }
 	public presenceDetected() { this._fsm.presenceDetected() }
 	public noPresenceDetected() { this._fsm.noPresenceDetected() }
 	public start = () => this._fsm.start()
 	public stop = () => this._fsm.stop()
 
-	/**
-	 * Enqueue a transition to happen as soon as the javascript politely defers its execution control,
-	 * such as when returning from a callback method or awaiting a promise.
-	 * This is useful when reacting to state machine lifecycle events, since you can't
-	 * enter a transition when already in a transition.
-	 * The transition is enqueued by using setTimeout() with 0 ms delay.
-	 * */
-	public enqueueTransition(action: Action, ...args: any[]): void {
-		setTimeout(() => this._fsm.fire(action), args)
-
-	}
 	public toggleStartStop() {
 		if (this._fsm.can('start')) {
 			this.start()
@@ -392,16 +386,18 @@ export class Commentator {
 		}
 	}
 
-	public facesDetected(payload: FacesDetectedPayload) {
-		const newFacesToIdentify: DetectedFaceWithImageData[] = payload.detectedFaces
-
-		this._facesToIdentify.push(...newFacesToIdentify)
-		if (this._fsm.can('facesDetected')) {
+	public facesDetected() {
+		if (!this._fsm.can('facesDetected')) {
+			console.warn('facesDetected: Cannot detect faces in current state: ' + this.state)
+		} else if (this._facesToIdentify.length === 0) {
+			console.error('facesDetected: No faces detected, this should normally not happen.')
+		} else {
 			this._fsm.facesDetected()
 		}
 	}
 
 	public facesIdentified(payload: FacesIdentifiedPayload) { this._fsm.facesIdentified(payload) }
+	public noFacesToIdentify() { this._fsm.noFacesToIdentify() }
 	public commentsDelivered() { this._fsm.commentsDelivered() }
 
 	/**
@@ -409,7 +405,7 @@ export class Commentator {
 	 * it may have continued entering other states by the time the resolve
 	 * handler is invoked.
 	 */
-	public waitForState(state: State, timeoutMs?: number): Promise<void> {
+	public waitForState(state: State, timeoutMs: number = 1000): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const timeoutHandle = setTimeout(() => reject(new Error('Timed out waiting for state: ' + state)), timeoutMs)
 			this._fsm.observe('onTransition', (lifeCycle, args) => {
@@ -437,12 +433,12 @@ export class Commentator {
 			this._setStatus('Hei.. er det noen her?', '🙂')
 			this._videoService.start()
 			this._presenceDetector.start(200)
-			this._facesToIdentify = [] // clear buffer
 		} else {
 			this._setStatus('Forlatt og alene igjen...', '😟')
 			this._faceDetector.stop()
 		}
 
+		this._facesToIdentify = [] // clear buffer
 		this._hasIdentifiedFacesInCurrentPresence = false
 	}
 
@@ -451,7 +447,7 @@ export class Commentator {
 
 		if (!this._presenceDetector.isDetected) {
 			console.info('User is no longer present, proceeding to not present state.')
-			this.enqueueTransition('noPresenceDetected')
+			this._enqueue('noPresenceDetected')
 			return
 		}
 
@@ -465,12 +461,12 @@ export class Commentator {
 			case 'deliverComments': {
 				if (this._facesToIdentify.length > 0) {
 					console.info(`${this._facesToIdentify.length} faces were detected in the meantime, immediately start identifying them.`)
-					this.enqueueTransition('facesDetected')
+					this._enqueue('facesDetected')
 					return
 				}
 				console.info('User is still present after delivering comments, continue to detect faces in the background.')
 				this._setStatus('Du er her fortsatt ja...', '😑')
-				break;
+				break
 			}
 			default: {
 				break
@@ -483,6 +479,12 @@ export class Commentator {
 		const facesToIdentify = this._facesToIdentify.slice()
 		this._facesToIdentify = []
 		console.info('Cleared faces detected buffer.')
+
+		if (facesToIdentify.length === 0) {
+			console.warn('No faces to identify, this should normally not happen.')
+			this._enqueue('noFacesToIdentify')
+			return
+		}
 
 		if (this._hasIdentifiedFacesInCurrentPresence) {
 			// Let's not spam status for the same person since this will
@@ -646,21 +648,46 @@ export class Commentator {
 			})
 		} catch (err) {
 			console.error('Failed to identify faces.', error(err))
+			this.error()
 		}
 	}
 
 	private async _onPeriodicDetectFacesAsync(): Promise<DetectedFaceWithImageData[]> {
-		console.debug(`On periodically detect faces...`)
-		const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-		console.debug(`Got image data url, detecting faces...`)
-		const result = await this._faceApi.detectFacesAsync(imageDataUrl)
-		console.debug(`detect faces result`, result)
+		try {
+			console.debug(`On periodically detect faces...`)
+			const imageDataUrl = this._videoService.getCurrentImageDataUrl()
+			console.debug(`Got image data url, detecting faces...`)
+			const result = await this._faceApi.detectFacesAsync(imageDataUrl)
+			console.debug(`detect faces result`, result)
 
-		return result.map(detectedFace => ({
-			faceId: detectedFace.faceId,
-			imageDataUrl,
-			result: detectedFace,
-		}))
+			return result.map(detectedFace => ({
+				faceId: detectedFace.faceId,
+				imageDataUrl,
+				result: detectedFace,
+			}))
+		} catch (err) {
+			if (err instanceof ThrottledHttpError) {
+				this._fsm.detectFacesFailedDueToThrottling()
+			}
+		}
+	}
+
+	private _enqueue(transition: Transition): void {
+		switch (transition) {
+			case 'start': this._enqueueAction(this.start); break
+			case 'stop': this._enqueueAction(this.stop); break
+			case 'presenceDetected': this._enqueueAction(this.presenceDetected); break
+			case 'noPresenceDetected': this._enqueueAction(this.noPresenceDetected); break
+			case 'facesDetected': this._enqueueAction(this.facesDetected); break
+			// case 'facesIdentified': this._enqueueAction(this.facesIdentified); break   arguments not supported, should refactor to argument-less
+			case 'noFacesToIdentify': this._enqueueAction(this.noFacesToIdentify); break
+			case 'commentsDelivered': this._enqueueAction(this.commentsDelivered); break
+			default: throw new Error('Transition not implemented: ' + transition)
+		}
+	}
+
+	private _enqueueAction(action: () => void): void {
+		setTimeout(action, 0)
 	}
 
 	private _setStatus(text: string, emoji: string) {

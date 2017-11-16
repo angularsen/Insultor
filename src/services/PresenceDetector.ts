@@ -1,6 +1,7 @@
 import * as moment from 'moment'
 type Moment = moment.Moment
 
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { EventDispatcher, IEvent } from './utils/Events'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'
@@ -134,6 +135,7 @@ export class PresenceDetector implements IPresenceDetector {
 		console.info('Stop polling presence.')
 		clearInterval(this._intervalTimer)
 		this._intervalTimer = undefined
+		this.isDetected = false
 	}
 
 	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score

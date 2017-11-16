@@ -1,4 +1,5 @@
 import {} from 'jasmine'
+import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 const jasmineReporters = require('jasmine-reporters')
