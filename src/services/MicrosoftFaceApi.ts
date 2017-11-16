@@ -68,7 +68,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		console.log('MicrosoftFaceApi: Add person face...', personId)
 
 		const method = 'POST'
-		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/persistedFaces`
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}/persistedFaces`
 		const headers = this._getDefaultHeaders('application/octet-stream')
 
 		const body = this._createBlob(imageDataUrl)
@@ -94,10 +94,11 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons`
 		const headers = this._getDefaultHeaders('application/json')
 
-		const body = {
+		// userData is also a JSON encoded string
+		const body = JSON.stringify({
 			name,
 			userData: JSON.stringify(userData),
-		}
+		})
 
 		try {
 			const res = await fetch(url, { method, headers, body })

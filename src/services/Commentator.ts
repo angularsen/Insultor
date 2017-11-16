@@ -266,7 +266,7 @@ export class Commentator {
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
-	private readonly _commentCooldownPerPerson = moment.duration(10, 'seconds')
+	private readonly _commentCooldownPerPerson = moment.duration(60, 'seconds')
 
 	/**
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
@@ -294,13 +294,22 @@ export class Commentator {
 	constructor(inputOpts: InputOpts) {
 		const defaultOpts: DefaultOpts = {
 			commentProvider : new FakeCommentProvider(),
-			detectFacesIntervalMs : 4000,
+			detectFacesIntervalMs : 6000,
 			init : 'idle',
 			speech : new FakeSpeech(),
 		}
 		const opts: CommentatorOptions = { ...{}, ...defaultOpts, ...inputOpts }
 
 		// Bind methods
+		this.start = this.start.bind(this)
+		this.stop = this.stop.bind(this)
+		this.presenceDetected = this.presenceDetected.bind(this)
+		this.noPresenceDetected = this.noPresenceDetected.bind(this)
+		this.facesDetected = this.facesDetected.bind(this)
+		this.facesIdentified = this.facesIdentified.bind(this)
+		this.noFacesToIdentify = this.noFacesToIdentify.bind(this)
+		this.commentsDelivered = this.commentsDelivered.bind(this)
+
 		this._enqueue = this._enqueue.bind(this)
 		this._enqueueAction = this._enqueueAction.bind(this)
 		this._onEnterDeliverComments = this._onEnterDeliverComments.bind(this)
@@ -335,13 +344,14 @@ export class Commentator {
 				{ from: '*', name              : 'stop', to              : 'idle' },
 				{ from: 'idle', name           : 'start', to             : 'detectPresence' },
 				{ from: 'idle', name           : 'presenceDetected', to  : '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'noPresenceDetected', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'facesDetected', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'facesIdentified', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'noFacesToIdentify', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'commentsDelivered', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'detectFacesFailedByThrottling', to: '' }, // Ignore late events after stopping
-				{ from: 'idle', name           : 'identifyFacesFailedByThrottling', to: '' }, // Ignore late events after stopping
+				{ from: 'idle', name           : 'noPresenceDetected', to: '' },
+				{ from: 'idle', name           : 'facesDetected', to: '' },
+				{ from: 'idle', name           : 'facesIdentified', to: '' },
+				{ from: 'idle', name           : 'noFacesToIdentify', to: '' },
+				{ from: 'idle', name           : 'commentsDelivered', to: '' },
+				{ from: 'idle', name           : 'detectFacesFailedByThrottling', to: '' },
+				{ from: 'idle', name           : 'identifyFacesFailedByThrottling', to: '' },
+				{ from: 'idle', name           : 'waitForThrottlingCompleted', to: '' },
 
 				{ from: 'detectPresence', name : 'presenceDetected', to  : 'detectFaces' },
 
@@ -350,6 +360,7 @@ export class Commentator {
 				{ from: 'detectFaces', name    : 'presenceDetected',   to: '' },
 				{ from: 'detectFaces', name    : 'detectFacesFailedByThrottling', to: 'waitForThrottling' },
 				{ from: 'detectFaces', name    : 'identifyFacesFailedByThrottling', to: 'waitForThrottling' },
+				{ from: 'detectFaces', name    : 'waitForThrottlingCompleted', to: '' },
 
 				{ from: 'identifyFaces', name  : 'facesIdentified', to   : 'deliverComments' },
 				{ from: 'identifyFaces', name  : 'noFacesToIdentify',  to: 'detectFaces' },
@@ -357,10 +368,14 @@ export class Commentator {
 				{ from: 'identifyFaces', name  : 'presenceDetected',   to: '' },
 				{ from: 'identifyFaces', name  : 'noPresenceDetected', to: '' },
 				{ from: 'identifyFaces', name  : 'detectFacesFailedByThrottling', to: '' },
+				{ from: 'identifyFaces', name  : 'waitForThrottlingCompleted', to: '' },
 
 				{ from: 'deliverComments', name: 'commentsDelivered', to : 'detectFaces' },
 				{ from: 'deliverComments', name: 'presenceDetected',   to: '' },
 				{ from: 'deliverComments', name: 'noPresenceDetected', to: '' },
+				{ from: 'deliverComments', name: 'detectFacesFailedByThrottling', to: '' },
+				{ from: 'deliverComments', name: 'identifyFacesFailedByThrottling', to: '' },
+				{ from: 'deliverComments', name: 'waitForThrottlingCompleted', to: '' },
 
 				// Ignore all but waitForThrottlingCompleted and stop (declared by wildcard above)
 				{ from: 'waitForThrottling', name  : 'waitForThrottlingCompleted', to: 'detectFaces' },
@@ -505,17 +520,14 @@ export class Commentator {
 				this._faceDetector.start()
 				break
 			}
-			case 'deliverComments': {
+			default: {
 				if (this._facesToIdentify.length > 0) {
 					console.info(`${this._facesToIdentify.length} faces were detected in the meantime, immediately start identifying them.`)
 					this._enqueue('facesDetected')
-					return
+				} else {
+					console.info('User is still present, continue to detect faces in the background.')
+					this._setStatus('Du er her fortsatt ja...', '😑')
 				}
-				console.info('User is still present after delivering comments, continue to detect faces in the background.')
-				this._setStatus('Du er her fortsatt ja...', '😑')
-				break
-			}
-			default: {
 				break
 			}
 		}
@@ -547,13 +559,13 @@ export class Commentator {
 
 	private _onEnterDeliverComments(lifecycle: Lifecycle, input: FacesIdentifiedPayload) {
 		console.info('onDeliverComments')
-		this._setStatus('Hør nå her', '😎')
 		// Do not await here to not block state transition
 		this._commentOnFacesAndPersonsAsync(input)
 	}
 
 	private _onEnterWaitForThrottling(lifecycle: Lifecycle) {
 		console.info('Wait 5 seconds for throttling...')
+		this._setStatus('Oops.. har brukt opp gratiskvoten, må vente litt!', '🙄')
 		setTimeout(() => {
 			console.info('Wait 5 seconds for throttling...DONE.')
 			this._fsm.waitForThrottlingCompleted()
@@ -650,6 +662,10 @@ export class Commentator {
 
 			const commentInputs = personComments.concat(faceComments)
 
+			if (commentInputs.length > 0) {
+				this._setStatus('Hør nå her', '😎')
+			}
+
 			for (const commentInput of commentInputs) {
 				if (!this._canCommentOnPerson(commentInput)) {
 					console.warn('Skip comment on person.', commentInput.person)
@@ -710,6 +726,7 @@ export class Commentator {
 			if (err instanceof ThrottledHttpError) {
 				console.warn('Identify faces was throttled, adding back faces for retry later.')
 				this._facesToIdentify.push(...facesToIdentify)
+				this._fsm.identifyFacesFailedByThrottling()
 			}
 			console.error('Failed to identify faces.', error(err))
 			this.error()
@@ -758,6 +775,7 @@ export class Commentator {
 	}
 
 	private _setStatus(text: string, emoji: string) {
+		console.info('Status changed', text, emoji, this.state)
 		this._status = { state: this.state, text, emoji }
 		this._onStatusChangedDispatcher.dispatch(this._status)
 	}
@@ -777,7 +795,7 @@ export class Commentator {
 			return true
 		}
 
-		const waitTimeText = this._commentCooldownPerPerson.subtract(timeSinceLast).humanize()
+		const waitTimeText = moment.duration(this._commentCooldownPerPerson).subtract(timeSinceLast).humanize()
 		console.info(`Too early to comment on person ${commentInput.name}, need to wait at least ${waitTimeText}.`)
 		return false
 	}

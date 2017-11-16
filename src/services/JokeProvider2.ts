@@ -14,8 +14,8 @@ export class JokeProvider {
 	public getJoke(faceAnalysis: DetectFaceResult): string {
 		if (faceAnalysis === undefined) return 'No joke for you!'
 
-		const { faceAttributes, glasses, emotion, hair } = faceAnalysis
-		const { smile, gender, age, facialHair } = faceAttributes
+		const { faceAttributes } = faceAnalysis
+		const { age, emotion, facialHair, gender, glasses, hair, smile, } = faceAttributes
 		const { bald, invisible, hairColor } = hair
 
 		const moustacheJoke = (facialHair && facialHair.moustache && facialHair.moustache >= 0.5)
