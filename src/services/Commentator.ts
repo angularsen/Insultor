@@ -25,26 +25,26 @@ import { IVideoService } from './VideoService'
 const StateMachine = require('javascript-state-machine')
 // tslint:disable-next-line:no-submodule-imports
 const StateMachineHistory = require('javascript-state-machine/lib/history')
-// tslint:restore:variable-name
+// tslint:enable:variable-name
 
 //#region Helper functions
 declare global {
-  interface Array<T> {
+	interface Array<T> {
 		/**
 		 * Returns the array with distinct/unique elements, optionally based on some property value.
 		 */
-    distinct<U>(map?: (el: T) => U): Array<T>
-  }
+		distinct<U>(map?: (el: T) => U): T[]
+	}
 }
 
 if (!Array.prototype.distinct) {
-  Array.prototype.distinct = function<T,U>(map?: (el: T) => U): T[] {
+	Array.prototype.distinct = function <T, U>(map?: (el: T) => U): T[] {
 		if (map) {
 		return this.filter((elem: T, pos: number, arr: T[]) => arr.map(map).indexOf(map(elem)) === pos)
 		} else {
 			return this.filter((elem: T, pos: number, arr: T[]) => arr.indexOf(elem) === pos)
 		}
-  }
+	}
 }
 
 function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
@@ -73,7 +73,7 @@ const Transition = strEnum([
 	'commentsDelivered',
 	'detectFacesFailedByThrottling',
 	'identifyFacesFailedByThrottling',
-	'waitForThrottlingCompleted'
+	'waitForThrottlingCompleted',
 ])
 type Transition = keyof typeof Transition
 
@@ -218,7 +218,7 @@ export const State = strEnum([
 	'detectFaces',
 	'identifyFaces',
 	'deliverComments',
-	'waitForThrottling'
+	'waitForThrottling',
 ])
 export type State = keyof typeof State
 
@@ -415,6 +415,7 @@ export class Commentator {
 
 		fsm.observe({
 			// States
+			// tslint:disable:object-literal-sort-keys
 			onIdle: this._onEnterIdle,
 			onDetectPresence: this._onEnterDetectPresence,
 			onDetectFaces: this._onEnterDetectFaces,
@@ -425,6 +426,7 @@ export class Commentator {
 				console.info(`transition [${lifecycle.transition}]: ${lifecycle.from} => ${lifecycle.to}`)
 				this._onTransitionDispacher.dispatch(lifecycle)
 			},
+			// tslint:enable:object-literal-sort-keys
 		})
 	}
 

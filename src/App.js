@@ -3,9 +3,9 @@ import ReactDOM from 'react-dom';
 import { Route, Switch } from 'react-router-dom';
 import { NavLink } from 'react-router-dom'
 
-import Home from './Home';
+import TestBin from './TestBin';
 import DiffCam from './DiffCam';
-import IdentifyOnPresence from './IdentifyOnPresence';
+import InsultMyFace from './InsultMyFace';
 import About from './About';
 
 const navBarListStyle = {
@@ -49,7 +49,7 @@ const Header = () => (
       <ul style={navBarListStyle}>
         <li style={navBarItemStyle}><NavLink style={navBarLogoLinkStyle} activeStyle={activeLinkStyle} to='/'><img style={navBarLogoStyle} src="img/logo-50p-square-white-trans.png" /></NavLink></li>
         <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/diffcam'>DiffCam</NavLink></li>
-        <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/identify-on-presence'>Insultor</NavLink></li>
+        <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/testbin'>TestBin</NavLink></li>
         <li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/about'>About</NavLink></li>
       </ul>
     </nav>
@@ -60,9 +60,9 @@ const Header = () => (
 const Main = () => (
   <main style={{padding: '0em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
     <Switch>
-      <Route exact path='/' component={Home}/>
+      <Route exact path='/' component={InsultMyFace}/>
       <Route exact path='/diffcam' component={DiffCam}/>
-      <Route exact path='/identify-on-presence' component={IdentifyOnPresence}/>
+      <Route exact path='/testbin' component={TestBin}/>
       <Route path='/about' component={About}/>
     </Switch>
   </main>
