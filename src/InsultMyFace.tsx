@@ -18,11 +18,6 @@ import { defaultSettings, Settings } from './Settings'
 const STATE_FACE_DETECTED = 'face detected'
 const STATE_PERSON_IDENTIFIED = 'person identified'
 
-// Persons:
-// Andreas Gullberg Larsen 1e797137-fa4c-4d2b-86e8-6032b1007a04
-// tslint:disable-next-line:max-line-length
-// 		face1 3651cd42-91f9-424f-84aa-e5e466a8f378 https://x4qqkg-sn3301.files.1drv.com/y4mrfl-hnbFB2TZfZBryCkMu9MdRAJN5Md7siS_iC96u-8L5mz1ow4aR6HZ48f3wN8QnV5QyP8oxybraZGMVS1t917hOJi3GXti_McLYZJUXU7SIX48klK9upfcui3R6CiGSkVloi3StSb10bdk1or5_24qPIOgKMP0sj0CyOG97wUjrljP3bEizMI5ha_hbfmEYOKFtUb1BjAK8rZQWY2oig/Andreas%20Gullberg%20Larsen%202017-05-30%20-%20profile%202%20square%20300p.jpg?psid=1
-
 const faceApiConfig = {
 	endpoint: 'https://northeurope.api.cognitive.microsoft.com/face/v1.0/',
 	myPersonalSubscriptionKey: 'e3778e3dab7c46bba4b0af4dcd3df272',
@@ -119,13 +114,9 @@ class Component extends React.Component<any, State> {
 	 * Live video element.
 	 */
 	private _video?: HTMLVideoElement
-	// private _presenceDetector: PresenceDetector
 
 	constructor() {
 		super()
-
-		// this._presenceDetector = new PresenceDetector({ video: null, onStateChanged: (state) => this.onPresenceStateChanged(state) })
-		// this.faceIdentityProvider = undefined
 
 		this.state = {
 			commentatorEmoji: '😶',
@@ -154,7 +145,7 @@ class Component extends React.Component<any, State> {
 	}
 
 	public componentDidMount() {
-		console.log('Mounted IdentifyOnPresence.')
+		console.log('Mounted InsultMyFace.')
 		const video = isDefined(this._video, '_video')
 		const motionDiffCanvas = isDefined(this._motionDiffCanvas, '_motionDiffCanvas')
 		const faceDetectCanvas = isDefined(this._faceDetectCanvas, '_faceDetectCanvas')
@@ -194,7 +185,7 @@ class Component extends React.Component<any, State> {
 	}
 
 	public componentWillUnmount() {
-		console.log('Unmounting IdentifyOnPresence.')
+		console.log('Unmounting InsultMyFace.')
 		this._commentator.stop()
 	}
 
@@ -204,7 +195,6 @@ class Component extends React.Component<any, State> {
 
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
 		const buttonStyle = { padding: '1em', minWidth: '6em' }
-		// const person = this.state.persons && this.state.persons[0]
 		const stateStyle: StateStyle = this._commentator ? getStateStyle(this._commentator) : { color: 'back', background: 'white' }
 
 		const trainingStatusDiv = trainingStatus ? (
@@ -214,7 +204,7 @@ class Component extends React.Component<any, State> {
 
 		const tmp = commentData ? (
 			<div>
-					<div style={{ textAlign: 'center', fontSize: 54/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
+					<div style={{ textAlign: 'center', fontSize: 49/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
 					<div style={{ textAlign: 'center', fontSize: '2em' }}><span>{commentData.name}</span></div>
 					<div style={{ textAlign: 'center', fontSize: '1.2em' }}><span>{commentData.speech.utterance.text}</span></div>
 					<div style={{ textAlign: 'center' }}><img src={commentData.imageDataUrl} style={{ width: 400 }} /></div>
@@ -223,9 +213,6 @@ class Component extends React.Component<any, State> {
 				<div>
 					<div style={{ textAlign: 'center', fontSize: 54/* too large for chrome Android '10em'*/ }}>{this.state.commentatorEmoji}</div>
 					<div style={{ textAlign: 'center', fontSize: '2em' }}>{this.state.commentatorStatus}</div>
-					{
-						// tslint:disable-next-line:max-line-length
-						/* <div style={{ textAlign: 'center' }}><img src="https://cdn.images.express.co.uk/img/dynamic/78/590x/secondary/Kim-Jong-un-missile-launch-1032502.jpg" style={{ width: 400 }} /></div> */}
 				</div>
 				)
 
@@ -268,11 +255,7 @@ class Component extends React.Component<any, State> {
 	private videoOnCanPlay(ev: React.SyntheticEvent<HTMLVideoElement>) {
 		const video: HTMLVideoElement = ev.target as HTMLVideoElement
 
-		console.log('IdentifyOnPresence: Video ready to play.')
-
-		// Scale height to achieve same aspect ratio for whatever our rendered width is
-		// const height = video.videoHeight / (video.videoWidth / this.state.width)
-		// this.setState({ height })
+		console.log('InsultMyFace: Video ready to play.')
 	}
 
 	private _onPresenceStateChanged(isPresenceDetected: boolean) {
@@ -280,7 +263,6 @@ class Component extends React.Component<any, State> {
 	}
 
 	private _onMotionScore(motionScore: number) {
-		// this._presenceDetector.addMotionScore(frame.score)
 		this.setState({ motionScore })
 	}
 
