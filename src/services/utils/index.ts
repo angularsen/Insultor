@@ -17,3 +17,12 @@ export function isDefined<T>(myParam: T | undefined, msg: string): T {
 	}
 	return myParam
 }
+
+export function timeout(ms: number): Promise<void> { return new Promise<void>((res) => setTimeout(res, ms)) }
+
+export function withTimeout<T>(srcPromise: Promise<T>, timeoutMs: number, err: string = 'Timed out.') {
+	return new Promise<T>((resolve, reject) => {
+		srcPromise.then(resolve, reject)
+		setTimeout(() => reject(err), timeoutMs)
+	})
+}

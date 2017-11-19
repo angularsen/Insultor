@@ -15,14 +15,14 @@ export class JokeProvider {
 		if (faceAnalysis === undefined) return 'No joke for you!'
 
 		const { faceAttributes } = faceAnalysis
-		const { age, emotion, facialHair, gender, glasses, hair, smile, } = faceAttributes
+		const { age, emotion, facialHair, gender, glasses, hair, smile } = faceAttributes
 		const { bald, invisible, hairColor } = hair
 
 		const moustacheJoke = (facialHair && facialHair.moustache && facialHair.moustache >= 0.5)
 			? jokes.moustache(facialHair.moustache) : []
 
 		const beardJoke = (facialHair && facialHair.beard && facialHair.beard >= 0.5) ? jokes.beard(facialHair.beard) : []
-		const hairJoke = (hairColor && hairColor.length > 0) ? jokes.hairColor(hairColor) : []
+		const hairJoke = (hairColor && hairColor.length > 0) ? jokes.hairColor(hairColor[0]) : []
 
 		const getEmotionJoke = (e: Emotion) => {
 			if (e && e.neutral >= 0.9) { return [`Lookin'.. neutral bro!`] }

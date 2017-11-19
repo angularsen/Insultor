@@ -47,8 +47,6 @@ if (!Array.prototype.distinct) {
 	}
 }
 
-function timeout(ms: number) { return new Promise<void>((res) => setTimeout(res, ms)) }
-
 function contains(arr: any[], predicate: (item: any, idx: number) => boolean) {
 		return arr.findIndex(predicate) >= 0
 }

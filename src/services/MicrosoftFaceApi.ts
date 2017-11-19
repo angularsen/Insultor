@@ -6,7 +6,10 @@ import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus'
 
+import { withTimeout } from '../services/utils/'
+
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
+const TIMEOUT = 10000
 
 async function ensureSuccessAsync(res: Response) {
 	if (!res.ok) {
@@ -74,7 +77,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const body = this._createBlob(imageDataUrl)
 
 		try {
-			const res = await fetch(url, { method, headers, body })
+			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 			await ensureSuccessAsync(res)
 			const result: AddPersonFaceResponse = await res.json()
 
@@ -101,7 +104,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		})
 
 		try {
-			const res = await fetch(url, { method, headers, body })
+			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 			await ensureSuccessAsync(res)
 			const person: CreatePersonResponse = await res.json()
 
@@ -154,7 +157,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const body = this._createBlob(imageDataUrl)
 
 		try {
-			const res = await fetch(url, { method, headers, body })
+			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
+
 			await ensureSuccessAsync(res)
 			const detectedFaces: DetectFacesResponse = await res.json()
 
@@ -179,7 +183,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
-			const res = await fetch(url, { method, headers })
+			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
+
 			await ensureSuccessAsync(res)
 
 			const persons: Person[] = await res.json()
@@ -209,7 +214,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		})
 
 		try {
-			const res = await fetch(url, { method, headers, body })
+			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
+
 			await ensureSuccessAsync(res)
 
 			const identifiedFaces: IdentifyFacesResponse = await res.json()
@@ -234,7 +240,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
-			const res = await fetch(url, { method, headers })
+			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
+
 			await ensureSuccessAsync(res)
 			return res.json()
 		} catch (err) {
@@ -250,7 +257,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
-			const res = await fetch(url, { method, headers })
+			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 			await ensureSuccessAsync(res)
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
@@ -265,7 +272,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
-			const res = await fetch(url, { method, headers })
+			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
+
 			await ensureSuccessAsync(res)
 			return res.json()
 		} catch (err) {
