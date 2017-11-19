@@ -4,14 +4,11 @@ import * as ReactDOM from 'react-dom'
 import * as moment from 'moment'
 type Moment = moment.Moment
 
-// import FaceIdentityProvider from './services/FaceIdentityProvider'
-import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
-
 import { Person } from '../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
 import { default as Commentator, DeliverCommentData, State as CommentatorState } from './services/Commentator'
 import CommentProvider from './services/CommentProvider'
-// import DiffCamEngine from './services/diff-cam-engine'
+import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import { default as PresenceDetector } from './services/PresenceDetector'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
@@ -59,14 +56,6 @@ function getStateStyle(commentator: Commentator): StateStyle {
 		case 'deliverComments': return { background: color50, color: lightTextColor }
 		default: return { background: color10, color: lightTextColor }
 	}
-}
-
-const getTimePeriodOfDay = () => {
-	const now = moment()
-	if (now.hour() < 5) return 'night'
-	if (now.hour() < 12) return 'morning'
-	if (now.hour() < 18) return 'evening'
-	return 'late evening'
 }
 
 async function getSettingsAsync(): Promise<Settings> {
