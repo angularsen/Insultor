@@ -247,12 +247,14 @@ export interface DeliverCommentData {
 //#endregion Exported types
 
 export class Commentator {
+	public get onHasFaceApiActivity(): IEvent<boolean> { return this._onHasFaceApiActivityDispatcher }
 	public get onSpeakCompleted(): IEvent<void> { return this._onSpeakCompletedDispatcher }
 	public get onSpeak(): IEvent<DeliverCommentData> { return this._onSpeakDispatcher }
 	public get onStatusChanged(): IEvent<StatusInfo> { return this._onStatusChangedDispatcher }
 	public get onTransition(): IEvent<Lifecycle> { return this._onTransitionDispacher }
 	public get status(): StatusInfo { return this._status }
 
+	private readonly _onHasFaceApiActivityDispatcher = new EventDispatcher<boolean>()
 	private readonly _onStatusChangedDispatcher = new EventDispatcher<StatusInfo>()
 	private readonly _onSpeakCompletedDispatcher = new EventDispatcher<void>()
 	private readonly _onSpeakDispatcher = new EventDispatcher<DeliverCommentData>()
@@ -593,7 +595,11 @@ export class Commentator {
 			const anonymousPersons: IdentifiedPerson[] = await Promise.all(
 				unidentifiedFaces.map(async (faceWithImageData) => {
 					console.info(`Create anonymous person for face [${faceWithImageData.faceId}].`)
+
+					this._onHasFaceApiActivityDispatcher.dispatch(true)
 					const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
+					this._onHasFaceApiActivityDispatcher.dispatch(false)
+
 					return {
 						confidence: 1,
 						detectedFace: faceWithImageData,
@@ -607,7 +613,9 @@ export class Commentator {
 			const identifiedPersons: IdentifiedPerson[] = await Promise.all(identifiedFaces.map(async identifiedFace => {
 				const personId = identifiedFace.candidates[0].personId
 				const cacheKey = `MS_FACEAPI_GET_PERSON:person[${personId}]`
+				this._onHasFaceApiActivityDispatcher.dispatch(true)
 				const person: Person = await Cache.getOrSetAsync(cacheKey, Cache.MAX_AGE_1DAY, () => this._faceApi.getPersonAsync(personId))
+				this._onHasFaceApiActivityDispatcher.dispatch(false)
 
 				const detectedFace = input.detectedFaces.find(df => df.faceId === identifiedFace.faceId)
 				if (!detectedFace) { throw new Error('Detected face not found. This is a bug.') }
@@ -714,7 +722,9 @@ export class Commentator {
 			const faceIds = facesToIdentify.map(x => x.faceId)
 
 			console.debug(`Identifying ${facesToIdentify.length} faces...`)
+			this._onHasFaceApiActivityDispatcher.dispatch(true)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds)
+			this._onHasFaceApiActivityDispatcher.dispatch(false)
 			console.debug(`Identifying ${facesToIdentify.length} faces...Complete.`)
 
 			// Identified faces (or not, commenting will handle anonymous faces)
@@ -738,7 +748,9 @@ export class Commentator {
 			console.debug(`On periodically detect faces...`)
 			const imageDataUrl = this._videoService.getCurrentImageDataUrl()
 			console.debug(`Got image data url, detecting faces...`)
+			this._onHasFaceApiActivityDispatcher.dispatch(true)
 			const result = await this._faceApi.detectFacesAsync(imageDataUrl)
+			this._onHasFaceApiActivityDispatcher.dispatch(false)
 			console.debug(`detect faces result`, result)
 
 			return result.map(detectedFace => ({

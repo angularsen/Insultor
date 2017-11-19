@@ -6,6 +6,7 @@ type Moment = moment.Moment
 
 import { Person } from '../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
+import Loader from './components/loader'
 import { default as Commentator, DeliverCommentData, State as CommentatorState } from './services/Commentator'
 import CommentProvider from './services/CommentProvider'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
@@ -73,6 +74,7 @@ interface State {
 	commentatorState: CommentatorState
 	commentatorStatus: string
 	commentatorEmoji: string
+	isFaceApiActive: boolean
 	motionScore: number
 	/** App settings  */
 	settings: Settings
@@ -118,6 +120,7 @@ class Component extends React.Component<any, State> {
 			commentatorEmoji: '😶',
 			commentatorState: 'idle',
 			commentatorStatus: 'Ikke startet enda...',
+			isFaceApiActive: false,
 			isPresenceDetected: false,
 			motionScore: 0,
 			settings: defaultSettings,
@@ -159,6 +162,12 @@ class Component extends React.Component<any, State> {
 			presenceDetector,
 			speech: this._speech,
 			videoService: new VideoService(video, faceDetectCanvas, VIDEO_WIDTH, VIDEO_HEIGHT),
+		})
+
+		this._commentator.onHasFaceApiActivity.subscribe(active => {
+			this.setState({
+				isFaceApiActive: active,
+			})
 		})
 
 		this._commentator.onStatusChanged.subscribe(status => {
@@ -215,6 +224,9 @@ class Component extends React.Component<any, State> {
 
 		return (
 			<div>
+				<div hidden={!this.state.isFaceApiActive}>
+					<Loader />
+				</div>
 				<div style={{ color: 'white', background: 'black', minHeight: '500px', width: '100%' }}>
 					{tmp}
 				</div>

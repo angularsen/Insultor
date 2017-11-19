@@ -11,7 +11,11 @@
     "jsx": "react",
     "types": [
       "node"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "*": ["*", "./@types/*"]
+    }
   },
   "exclude": [
     "node_modules",
