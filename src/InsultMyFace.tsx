@@ -15,18 +15,13 @@ import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
 import { defaultSettings, Settings } from './Settings'
 
-const STATE_FACE_DETECTED = 'face detected'
-const STATE_PERSON_IDENTIFIED = 'person identified'
+const VIDEO_WIDTH = 600
+const VIDEO_HEIGHT = 600
 
 const faceApiConfig = {
 	endpoint: 'https://northeurope.api.cognitive.microsoft.com/face/v1.0/',
 	myPersonalSubscriptionKey: 'e3778e3dab7c46bba4b0af4dcd3df272',
 	webstepPersonGroupId: 'insultor-webstep-trd',
-}
-
-interface Size {
-	height: number
-	width: number
 }
 
 const speech = new Speech()
@@ -83,9 +78,10 @@ interface State {
 	settings: Settings
 	/** Currently speaking this text, undefined otherwise. */
 	commentData?: DeliverCommentData
-	videoSize: Size
 	/** Last polled training status */
 	trainingStatus?: PersonGroupTrainingStatus
+	videoHeight: number
+	videoWidth: number
 }
 
 interface StateStyle {
@@ -103,10 +99,10 @@ class Component extends React.Component<any, State> {
 	 */
 	private _faceDetectCanvas?: HTMLCanvasElement
 
-	/**
-	 * Copying over images for comparing image difference compared to a baseline (background).
-	 */
-	private _motionDiffCanvas?: HTMLCanvasElement
+	/** Diff calculation canvas by rendering new frames with a 'difference' filter on top of previous frames. */
+	private _diffCalcCanvas?: HTMLCanvasElement
+	/** Resulting diff image. */
+	private _diffResultCanvas?: HTMLCanvasElement
 
 	private readonly _speech = new Speech()
 
@@ -126,7 +122,8 @@ class Component extends React.Component<any, State> {
 			motionScore: 0,
 			settings: defaultSettings,
 			trainingStatus: undefined,
-			videoSize: { width: 640, height: 480 },
+			videoHeight: VIDEO_WIDTH,
+			videoWidth: VIDEO_HEIGHT,
 		}
 
 		this._faceApi = new MicrosoftFaceApi(
@@ -147,10 +144,11 @@ class Component extends React.Component<any, State> {
 	public componentDidMount() {
 		console.log('Mounted InsultMyFace.')
 		const video = isDefined(this._video, '_video')
-		const motionDiffCanvas = isDefined(this._motionDiffCanvas, '_motionDiffCanvas')
 		const faceDetectCanvas = isDefined(this._faceDetectCanvas, '_faceDetectCanvas')
+		const diffCalcCanvas = isDefined(this._diffCalcCanvas, '_diffCalcCanvas')
+		const diffResultCanvas = isDefined(this._diffResultCanvas, '_diffResultCanvas')
 
-		const presenceDetector = new PresenceDetector({ diffCanvas: motionDiffCanvas, video })
+		const presenceDetector = new PresenceDetector({ diffCalcCanvas, diffResultCanvas, video })
 		presenceDetector.onMotionScore.subscribe(motionScore => {
 			this.setState({ motionScore })
 		})
@@ -160,7 +158,7 @@ class Component extends React.Component<any, State> {
 			faceApi: this._faceApi,
 			presenceDetector,
 			speech: this._speech,
-			videoService: new VideoService(video, faceDetectCanvas),
+			videoService: new VideoService(video, faceDetectCanvas, VIDEO_WIDTH, VIDEO_HEIGHT),
 		})
 
 		this._commentator.onStatusChanged.subscribe(status => {
@@ -190,8 +188,7 @@ class Component extends React.Component<any, State> {
 	}
 
 	public render() {
-		const { commentData, trainingStatus, videoSize } = this.state
-		const { width, height } = videoSize
+		const { commentData, trainingStatus } = this.state
 
 		const startStopButtonText = this.state.commentatorState === 'idle' ? 'Start' : 'Stop'
 		const buttonStyle = { padding: '1em', minWidth: '6em' }
@@ -233,16 +230,21 @@ class Component extends React.Component<any, State> {
 						<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
 					</div>
 					<div className='camera'>
-						<video style={{ border: '1px solid lightgrey' }} id='video' ref={(video) => this._video = video || undefined}
-							width={width} height={height} onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
+						<video style={{ border: '1px solid lightgrey', width: '100%' }} id='video' ref={(video) => this._video = video || undefined}
+							onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
 					</div>
 					<div>
-						<canvas style={{ border: '1px solid lightgrey' }} id='motion-diff-canvas'
-							ref={(canvas) => this._motionDiffCanvas = canvas || undefined}></canvas>
+						<canvas style={{ border: '1px solid lightgrey' }} id='diff-calc-canvas'
+							width={64} height={64}
+							ref={(canvas) => this._diffCalcCanvas = canvas || undefined}></canvas>
+						<canvas style={{ border: '1px solid lightgrey' }} id='diff-result-canvas'
+							width={64} height={64}
+							ref={(canvas) => this._diffResultCanvas = canvas || undefined}></canvas>
 					</div>
 					<div>
-						<canvas style={{ border: '1px solid lightgrey' }} id='faceapi-canvas' ref={(canvas) => this._faceDetectCanvas = canvas || undefined}
-							></canvas>
+						<canvas style={{ border: '1px solid lightgrey', width: '100%' }} id='faceapi-canvas'
+						width={this.state.videoWidth} height={this.state.videoHeight}
+							ref={(canvas) => this._faceDetectCanvas = canvas || undefined}></canvas>
 					</div>
 					<p>
 						{this.state.error ? 'Error happened: ' + this.state.error : ''}

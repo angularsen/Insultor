@@ -39,7 +39,11 @@ interface DefaultOpts {
 
 interface InputOpts {
 	// Required
-	diffCanvas: HTMLCanvasElement
+	/** Canvas for calculating diff values, by comparing differences of captured images. */
+	diffCalcCanvas: HTMLCanvasElement
+	/** Canvas with the resulting diff values, for visualizing the diff. */
+	diffResultCanvas: HTMLCanvasElement
+	/** The video element to copy images from. */
 	video: HTMLVideoElement
 
 	// Optional
@@ -50,11 +54,9 @@ interface InputOpts {
 	pixelDiffThreshold?: number
 }
 
-// type Foo = InputOpts & DefaultOpts
-// const foo: Foo
-
 export interface PresenceDetectorOpts  {
-	diffCanvas: HTMLCanvasElement
+	diffCalcCanvas: HTMLCanvasElement
+	diffResultCanvas: HTMLCanvasElement
 	diffHeight: number
 	diffWidth: number
 	motionScoreThreshold: number
@@ -68,7 +70,6 @@ export interface PresenceDetectorOpts  {
 export interface IPresenceDetector {
 	isDetected: boolean
 	readonly onIsDetectedChanged: IEvent<boolean>
-	// addMotionScore(motionScore: number, receivedOnDate: Moment): void
 	start(pollIntervalMs?: number): void
 	stop(): void
 }
@@ -83,17 +84,17 @@ export class PresenceDetector implements IPresenceDetector {
 	public get onMotionScore(): IEvent<number> { return this._onMotionScoreDispatcher }
 	public get onIsDetectedChanged(): IEvent<boolean> { return this._onIsDetectedChangedDispatcher }
 
+	private readonly _diffCalcContext: CanvasRenderingContext2D
+	private readonly _diffResultContext: CanvasRenderingContext2D
+	private readonly _diffImageSize: Size
 	private readonly _onIsDetectedChangedDispatcher = new EventDispatcher<boolean>()
 	private readonly _onMotionScoreDispatcher = new EventDispatcher<number>()
-
-	private _diffContext: CanvasRenderingContext2D
-	// private _diffCanvas: HTMLCanvasElement
-	private _diffImageSize: Size
-	private _intervalTimer?: NodeJS.Timer
-	private _motionStart?: Moment
-	// private _pixelDiffThreshold: number
-	private _lastMotionOn?: Moment
 	private readonly _opts: PresenceDetectorOpts
+
+	private _intervalTimer?: NodeJS.Timer
+	private _isReadyToDiff: boolean
+	private _motionStart?: Moment
+	private _lastMotionOn?: Moment
 
 	constructor(opts: InputOpts) {
 		const defaultOpts: DefaultOpts = {
@@ -106,13 +107,11 @@ export class PresenceDetector implements IPresenceDetector {
 		this._opts = { ...{}, ...opts, ...defaultOpts }
 		this.isDetected = false
 
-		// this._video = isDefined(this._opts.video, 'video')!
-		// this._diffCanvas = isDefined(this._opts.diffCanvas, 'motionCanvas')!
-		this._diffContext = isDefined(this._opts.diffCanvas.getContext('2d'), 'diffContext')!
+		this._diffCalcContext = isDefined(this._opts.diffCalcCanvas.getContext('2d'), 'diffCalcContext')!
+		this._diffResultContext = isDefined(this._opts.diffResultCanvas.getContext('2d'), 'diffResultContext')!
 		this._diffImageSize = { width: this._opts.diffWidth || 64, height: this._opts.diffHeight || 64 }
-		// this._pixelDiffThreshold = isDefined(this._opts.pixelDiffThreshold, 'pixelDiffThreshold')!
 
-		this._checkPresenceInImage = this._checkPresenceInImage.bind(this)
+		this._updateMotionScoreFromImage = this._updateMotionScoreFromImage.bind(this)
 		this._setIsDetected = this._setIsDetected.bind(this)
 	}
 
@@ -123,7 +122,7 @@ export class PresenceDetector implements IPresenceDetector {
 		}
 
 		console.info('Start polling presence.')
-		this._intervalTimer = setInterval(this._checkPresenceInImage, pollIntervalMs)
+		this._intervalTimer = setInterval(this._updateMotionScoreFromImage, pollIntervalMs)
 	}
 
 	public stop(): void {
@@ -134,8 +133,10 @@ export class PresenceDetector implements IPresenceDetector {
 
 		console.info('Stop polling presence.')
 		clearInterval(this._intervalTimer)
+		this._diffCalcContext.clearRect(0, 0, this._opts.diffWidth, this._opts.diffHeight)
 		this._intervalTimer = undefined
 		this.isDetected = false
+		this._isReadyToDiff = false
 	}
 
 	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score
@@ -181,25 +182,35 @@ export class PresenceDetector implements IPresenceDetector {
 		}
 	}
 
-	private _checkPresenceInImage() {
-		const diffContext = this._diffContext
+	private _updateMotionScoreFromImage() {
+		const diffCalcContext = this._diffCalcContext
 		const video = this._opts.video
 		const {width, height} = this._diffImageSize
 
+		if (!this._isReadyToDiff) {
+			// Draw first frame for diff on next frame
+			diffCalcContext.globalCompositeOperation = 'source-over'
+			diffCalcContext.drawImage(video, 0, 0, width, height)
+			this._isReadyToDiff = true
+		}
+
 		// diff current capture over previous capture, leftover from last time
-		diffContext.globalCompositeOperation = 'difference'
-		diffContext.drawImage(video, 0, 0, width, height)
+		diffCalcContext.globalCompositeOperation = 'difference'
+		diffCalcContext.drawImage(video, 0, 0, width, height)
 
 		// Get diff image
-		const diffImageData = diffContext.getImageData(0, 0, width, height)
+		const diffImageData = diffCalcContext.getImageData(0, 0, width, height)
 		const motionScore = this._processDiff(diffImageData)
-
-		// draw current capture normally over diff, ready for next time
-		diffContext.globalCompositeOperation = 'source-over'
-		diffContext.drawImage(video, 0, 0, width, height)
 
 		this._onMotionScore(motionScore)
 		this._onMotionScoreDispatcher.dispatch(motionScore)
+
+		// Visualize diff
+		this._diffResultContext.putImageData(diffImageData, 0, 0)
+
+		// Draw current capture normally over diff, ready for next time
+		diffCalcContext.globalCompositeOperation = 'source-over'
+		diffCalcContext.drawImage(video, 0, 0, width, height)
 	}
 
 	private _setIsDetected(state: boolean) {

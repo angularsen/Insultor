@@ -31,25 +31,13 @@ export class VideoService implements IVideoService {
 	private videoStream: MediaStream
 
 	constructor(
-		private readonly _video: HTMLVideoElement = document.createElement('video'),
-		private readonly _copyImageCanvas: HTMLCanvasElement = document.createElement('canvas'),
-		private readonly _width: number = 200,
-		// private readonly _height: number = 200,
+		private readonly _video: HTMLVideoElement,
+		private readonly _copyImageCanvas: HTMLCanvasElement,
+		private readonly _width: number = 500,
+		private readonly _height: number = 500,
 		) {
 		isDefined(_video, '_video')
 		isDefined(_copyImageCanvas, '_copyImageCanvas')
-
-		_video.width = _width
-		// _video.height = _height
-
-		// console.log('Initialize DiffCamEngine')
-		// DiffCamEngine.init({
-		// 	captureCallback: this._onDiffCamFrame,
-		// 	captureIntervalTime: 200,
-		// 	initSuccessCallback: () => DiffCamEngine.start(),
-		// 	motionCanvas: this.canvas,
-		// 	video: this.video,
-		// })
 	}
 
 	public drawCurrentImageOnCanvas(canvas: HTMLCanvasElement): void {
@@ -80,6 +68,7 @@ export class VideoService implements IVideoService {
 			video: {
 				facingMode: 'user',
 				frameRate: { ideal: 10, max: 30 },
+				height: this._height,
 				width: this._width,
 			},
 		})
