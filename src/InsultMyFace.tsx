@@ -8,10 +8,10 @@ import { default as Commentator, DeliverCommentData, State as CommentatorState }
 import CommentProvider from './services/CommentProvider'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import { default as PresenceDetector } from './services/PresenceDetector'
+import { defaultSettings, Settings } from './services/Settings'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
-import { defaultSettings, Settings } from './Settings'
 
 const VIDEO_WIDTH = 600
 const VIDEO_HEIGHT = 600
