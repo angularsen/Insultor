@@ -1,5 +1,6 @@
 import { differenceInMilliseconds } from 'date-fns'
-import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
+// Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
+import { clearInterval, setInterval, setTimeout } from 'timers'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { isDefined, strEnum } from './utils/index'
 import { IVideoService } from './VideoService'

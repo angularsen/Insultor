@@ -1,5 +1,6 @@
 import { differenceInMilliseconds } from 'date-fns'
-import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
+// Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
+import { clearTimeout, setInterval, setTimeout } from 'timers'
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import Person, { UserData } from '../../docs/FaceAPI/Person'
