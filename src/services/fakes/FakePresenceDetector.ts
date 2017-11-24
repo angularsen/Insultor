@@ -1,6 +1,3 @@
-import * as moment from 'moment'
-type Moment = moment.Moment
-
 import { IPresenceDetector } from '../PresenceDetector'
 import { EventDispatcher, IEvent } from '../utils/Events'
 
@@ -16,7 +13,7 @@ export class FakePresenceDetector implements IPresenceDetector {
 	public stop(): void {
 		console.log('FakePresenceDetector: Stop detecting presence.')
 	}
-	public addMotionScore(motionScore: number, receivedOnDate: Moment): void {
+	public addMotionScore(motionScore: number, receivedOnDate: Date): void {
 		console.log('FakePresenceDetector: Added motion score ' + motionScore)
 	}
 	public get isDetected() {

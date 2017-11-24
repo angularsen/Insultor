@@ -1,6 +1,4 @@
-import * as moment from 'moment'
-type Moment = moment.Moment
-
+import { differenceInMilliseconds } from 'date-fns'
 import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFaceResult, IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
@@ -266,7 +264,7 @@ export class Commentator {
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
 	private readonly _videoService: IVideoService
-	private readonly _commentCooldownPerPerson = moment.duration(60, 'seconds')
+	private readonly _commentCooldownPerPersonMs = 60 * 1000
 
 	/**
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
@@ -801,13 +799,13 @@ export class Commentator {
 			return true
 		}
 
-		const timeSinceLast = moment.duration(moment().diff(prevComment.when))
-		if (timeSinceLast > this._commentCooldownPerPerson) {
-			console.debug('OK, long enough since previous comment.', timeSinceLast)
+		const timeSinceLastMs = differenceInMilliseconds(new Date(), prevComment.when)
+		if (timeSinceLastMs > this._commentCooldownPerPersonMs) {
+			console.debug('OK, long enough since previous comment.', timeSinceLastMs)
 			return true
 		}
 
-		const waitTimeText = moment.duration(this._commentCooldownPerPerson).subtract(timeSinceLast).humanize()
+		const waitTimeText = `${Math.round((this._commentCooldownPerPersonMs - timeSinceLastMs) / 1000)} seconds`
 		console.info(`Too early to comment on person ${commentInput.name}, need to wait at least ${waitTimeText}.`)
 		return false
 	}

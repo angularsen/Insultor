@@ -1,6 +1,4 @@
-import * as moment from 'moment'
-type Moment = moment.Moment
-
+import { differenceInMilliseconds } from 'date-fns'
 import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import {isDefined } from './utils'
@@ -75,7 +73,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 
 		let timeToWaitMs = 0
 		try {
-			const detectStart = moment()
+			const detectStart = new Date()
 			console.info(`PeriodicFaceDetector: Detecting faces...`)
 			console.debug(`PeriodicFaceDetector: this._detectFacesAsync: `, this._detectFacesAsync)
 			const detectFacesResult = await this._detectFacesAsync()
@@ -93,7 +91,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 				console.debug(`PeriodicFaceDetector: No faces detected.`)
 			}
 
-			const durationMs = moment().diff(detectStart)
+			const durationMs = differenceInMilliseconds(new Date(), detectStart)
 			timeToWaitMs = Math.max(0, intervalMs - durationMs)
 			console.debug(`PeriodicFaceDetector: Last request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
 		} catch (err) {

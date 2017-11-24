@@ -1,5 +1,3 @@
-import * as  moment from 'moment'
-
 export const MAX_AGE_1DAY = 24 * 3600 * 1000
 
 function getOrPruneIfOld<T>(cacheKey: string): T | undefined {
@@ -8,7 +6,7 @@ function getOrPruneIfOld<T>(cacheKey: string): T | undefined {
 
 	try {
 		const entry = JSON.parse(entryJson)
-		if (entry._cacheExpires && moment(entry._cacheExpires) > moment()) {
+		if (entry._cacheExpires && new Date(entry._cacheExpires) > new Date()) {
 			// Not expired
 			return entry
 		}
@@ -32,7 +30,7 @@ export async function getOrSetAsync<T>(cacheKey: string, maxAgeMs: number, facto
 
 	// Spread does not support generic type T
 	// tslint:disable-next-line:prefer-object-spread
-	const newEntry = Object.assign({}, value, { _cacheExpires: moment.utc().toISOString() })
+	const newEntry = Object.assign({}, value, { _cacheExpires: new Date().toISOString() })
 	localStorage.setItem(cacheKey, JSON.stringify(newEntry))
 	return value
 }

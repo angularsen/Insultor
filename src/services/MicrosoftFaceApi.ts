@@ -1,6 +1,3 @@
-import * as moment from 'moment'
-type Moment = moment.Moment
-
 import { DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
 import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../docs/FaceAPI/Person'
@@ -122,7 +119,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const userData: UserData = {
 			anonymous: true,
-			created: moment().toISOString(),
+			created: new Date().toISOString(),
 			firstName: 'Ukjent',
 			lastName: 'Vandrer',
 		}

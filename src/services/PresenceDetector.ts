@@ -1,6 +1,4 @@
-import * as moment from 'moment'
-type Moment = moment.Moment
-
+import { differenceInMilliseconds } from 'date-fns'
 import { setInterval, setTimeout } from 'timers' // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { EventDispatcher, IEvent } from './utils/Events'
 import { isDefined, strEnum } from './utils/index'
@@ -93,8 +91,8 @@ export class PresenceDetector implements IPresenceDetector {
 
 	private _intervalTimer?: NodeJS.Timer
 	private _isReadyToDiff: boolean
-	private _motionStart?: Moment
-	private _lastMotionOn?: Moment
+	private _motionStart?: Date
+	private _lastMotionOn?: Date
 
 	constructor(opts: InputOpts) {
 		const defaultOpts: DefaultOpts = {
@@ -140,7 +138,7 @@ export class PresenceDetector implements IPresenceDetector {
 	}
 
 	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score
-	private _onMotionScore(motionScore: number, receivedOnDate: Moment = moment()) {
+	private _onMotionScore(motionScore: number, receivedOnDate: Date = new Date()) {
 		const wasDetected = this.isDetected
 		const isDetectedNow = motionScore > this._opts.motionScoreThreshold
 
@@ -148,16 +146,16 @@ export class PresenceDetector implements IPresenceDetector {
 			if (isDetectedNow) {
 				if (this._motionStart === undefined) {
 					console.info('Initial detection of person.')
-					this._motionStart = moment()
+					this._motionStart = new Date()
 				}
-				this._lastMotionOn = moment()
-				const motionDurationMs = moment().diff(this._motionStart)
+				this._lastMotionOn = new Date()
+				const motionDurationMs = differenceInMilliseconds(new Date(), this._motionStart)
 				if (motionDurationMs > initialDetectionDurationMs) {
 					console.info('Presence detected.')
 					this._setIsDetected(true)
 				}
-			} else {
-				const detectionGapDurationMs = moment().diff(this._lastMotionOn)
+			} else if (this._lastMotionOn) {
+				const detectionGapDurationMs = differenceInMilliseconds(new Date(), this._lastMotionOn)
 				if (detectionGapDurationMs > maxInitialDetectionGapMs) {
 					// Reset initial detection timers if detection gap is too long
 					console.info('Timed out on gap in initial detection.')
@@ -168,9 +166,9 @@ export class PresenceDetector implements IPresenceDetector {
 		} else {
 			if (isDetectedNow) {
 				// Presence is sustained
-				this._lastMotionOn = moment()
-			} else {
-				const detectionGapDurationMs = moment().diff(this._lastMotionOn)
+				this._lastMotionOn = new Date()
+			} else if (this._lastMotionOn) {
+				const detectionGapDurationMs = differenceInMilliseconds(new Date(), this._lastMotionOn)
 				if (detectionGapDurationMs > maxPresenceDetectionGapMs) {
 					// Motion no longer detected, demote to not present if person is out of camera view for some time
 					console.info('Presence ended.')

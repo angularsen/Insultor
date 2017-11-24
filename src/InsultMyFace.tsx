@@ -1,9 +1,6 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 
-import * as moment from 'moment'
-type Moment = moment.Moment
-
 import { Person } from '../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus'
 import Loader from './components/loader'
