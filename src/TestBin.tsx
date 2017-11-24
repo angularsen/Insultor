@@ -1,7 +1,7 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 
-import JokeProvider from './services/JokeProvider2'
+import JokeProvider from './services/JokeProvider'
 import Speech, { ISpeechOpts } from './services/Speech'
 
 const speech = new Speech()

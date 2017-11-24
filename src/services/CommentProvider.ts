@@ -1,7 +1,7 @@
 import { DetectFaceResult } from '../../docs/FaceAPI/DetectFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
 import { Settings } from '../Settings'
-import JokesProvider from './JokeProvider2'
+import JokeProvider from './JokeProvider'
 
 function getRandomInt(min: number, max: number) {
 	return Math.floor(Math.random() * (max - min + 1)) + min
@@ -18,7 +18,7 @@ export interface ICommentProvider {
 
 export class CommentProvider implements ICommentProvider {
 	private _settings?: Settings = undefined
-	private readonly _jokes = new JokesProvider()
+	private readonly _jokes = new JokeProvider()
 
 	constructor(settingsPromise: Promise<Settings>) {
 		settingsPromise
