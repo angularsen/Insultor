@@ -37,6 +37,26 @@ export class JokeProvider {
 		const jokesArr = flatten([moustacheJoke, beardJoke, hairJoke, emotionJoke, glassesJoke])
 		return getRandom(jokesArr)
 	}
+
+	public randomJoke() {
+		// TODO Aggregate all jokes somehow
+		return jokes.anger(1)[0]
+	}
+
+	public randomWifeyMorningCompliment() {
+		const wifeyCompliments = [
+			'You look absolutely stunning this morning!',
+		]
+
+		const feelGoodQuotes = [
+			'This will be a great day, now go enjoy it!',
+			'Yesterday is HISTORY, tomorrow is a MYSTERY, but TODAY is a GIFT; that’s why we call it the PRESENT',
+			'Be Thankful for What You Have... and You Will End Up Having More',
+		]
+
+		return getRandom(wifeyCompliments.concat(feelGoodQuotes))
+	}
+
 }
 
 export default JokeProvider
