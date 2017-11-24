@@ -137,7 +137,7 @@ export class PresenceDetector implements IPresenceDetector {
 		this._isReadyToDiff = false
 	}
 
-	// Call this method for every frame received from diff-cam-engine, or some other means to calculate motion score
+	// Call this method periodically with some measure of motion/presenc
 	private _onMotionScore(motionScore: number, receivedOnDate: Date = new Date()) {
 		const wasDetected = this.isDetected
 		const isDetectedNow = motionScore > this._opts.motionScoreThreshold

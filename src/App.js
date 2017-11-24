@@ -4,7 +4,6 @@ import { Route, Switch } from 'react-router-dom';
 import { NavLink } from 'react-router-dom'
 
 import TestBin from './TestBin';
-import DiffCam from './DiffCam';
 import InsultMyFace from './InsultMyFace';
 import About from './About';
 
@@ -61,7 +60,6 @@ const Main = () => (
   <main style={{padding: '0em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
     <Switch>
       <Route exact path='/' component={InsultMyFace}/>
-      <Route exact path='/diffcam' component={DiffCam}/>
       <Route exact path='/testbin' component={TestBin}/>
       <Route path='/about' component={About}/>
     </Switch>
