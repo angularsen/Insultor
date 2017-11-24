@@ -69,8 +69,8 @@
     "tslint": "^5.8.0",
     "typescript": "^2.6.1",
     "typings-for-css-modules-loader": "^1.7.0",
-    "uglifyjs-webpack-plugin": "^1.1.0",
+    "uglifyjs-webpack-plugin": "^1.1.1",
     "webpack": "^3.8.1",
-    "webpack-dev-middleware": "^1.11.0"
+    "webpack-dev-middleware": "^1.12.1"
   }
 }
