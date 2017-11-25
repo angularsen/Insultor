@@ -97,17 +97,21 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 		// From: https://gist.github.com/angularsen/08998fe7673b485de800a4c1c1780e62
 		// To:   https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62
 		const matches = gistUrl.match(/gist.github.com\/(.*?)\/(.*?)\//)
-		if (!matches || matches.length <= 1) { return }
+		if (!matches) { throw new Error('Did not recognize gist URL: ' + gistUrl) }
 
 		const [, username, gistId] = matches
-		const rawGitUrl = gistUrl.replace('gist.github.com', 'rawgit.com')
-		const res = await fetch(gistUrl)
-		if (!res.ok) {
-			console.warn('Failed to get settings.', res)
+		const apiUrl = `https://api.github.com/gists/${gistId}`
+
+		const gistRes = await fetch(apiUrl)
+		if (!gistRes.ok) {
+			console.warn('Failed to get gist.', gistRes)
 			return defaultSettings
 		}
 
-		const settings: Settings = await res.json()
+		const gistBody = await gistRes.json()
+const settingsFileInfo = gistBody.files['settings.json']
+
+		const settings: Settings = await gistRes.json()
 		if (!settings || !settings.persons) {
 			console.error('Invalid settings stored.', settings)
 			return defaultSettings
