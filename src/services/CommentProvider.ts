@@ -1,6 +1,6 @@
 import { DetectFaceResult } from '../../docs/FaceAPI/DetectFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
-import { Settings } from '../Settings'
+import { Settings } from '../services/Settings'
 import JokeProvider from './JokeProvider'
 
 function getRandomInt(min: number, max: number) {

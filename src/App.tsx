@@ -4,6 +4,7 @@ import { NavLink, Route, Switch } from 'react-router-dom'
 
 import About from './About'
 import InsultMyFace from './InsultMyFace'
+import Settings from './Settings'
 import TestBin from './TestBin'
 
 const headerStyle: React.CSSProperties = {
@@ -58,6 +59,7 @@ const Header: React.StatelessComponent<{}> = () => (
 					<NavLink style={navBarLogoLinkStyle} activeStyle={activeLinkStyle} to='/'>
 						<img style={navBarLogoStyle} src='img/logo-50p-square-white-trans.png' /></NavLink></li>
 				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/testbin'>TestBin</NavLink></li>
+				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/settings'>Innstillinger</NavLink></li>
 				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/about'>About</NavLink></li>
 			</ul>
 		</nav>
@@ -71,6 +73,7 @@ const Main: React.StatelessComponent<{}> = () => (
 		<Switch>
 			<Route exact path='/' component={InsultMyFace}/>
 			<Route exact path='/testbin' component={TestBin}/>
+			<Route exact path='/settings' component={Settings}/>
 			<Route path='/about' component={About}/>
 		</Switch>
 	</main>

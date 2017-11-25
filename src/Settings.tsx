@@ -1,59 +1,45 @@
-import { clearTimeout, setTimeout } from 'timers'
-
 import * as React from 'react'
+import { debounce } from 'underscore'
 import { defaultSettings, Settings } from './services/Settings'
 
-function debounce<T>(func: (arg: T) => void, wait: number, immediate: boolean = false) {
-	let timeout: NodeJS.Timer | null = null
-	return function() {
-		// tslint:disable-next-line:no-this-assignment
-		const context = this
-		const args = arguments
-		const later = () => {
-			timeout = null
-			if (!immediate) func.apply(context, args)
-		}
-		const callNow = immediate && !timeout
-		clearTimeout(timeout!)
-		timeout = setTimeout(later, wait)
-		if (callNow) func.apply(context, args)
-	}
+/** localStorage key names */
+const storageKeys = {
+	githubToken: 'GITHUB_GISTS_TOKEN',
+	settingsGistUrl: 'GIST_URL',
 }
-
-const GITHUB_TOKEN = 'GITHUB_GISTS_TOKEN'
-const SETTINGS_GIST_URL = 'GITHUB_GISTS_TOKEN'
 
 class Component extends React.Component<{}, { githubToken: string, settingsGistUrl: string, settings: Settings }> {
 
-	private _onTokenChange = debounce((event: React.FormEvent<HTMLInputElement>) => {
+	private readonly _onTokenChange = debounce((value: string) => {
 		console.info('Saved github token to local storage.')
-		localStorage.setItem(GITHUB_TOKEN, event.currentTarget.value)
-
-		// this.reload()
-		// fetch()
+		localStorage.setItem(storageKeys.githubToken, value)
+		this._loadSettingsAsync()
 	}, 1000)
 
-	private _onSettingsGistUrlChange = debounce((event: React.FormEvent<HTMLInputElement>) => {
+	private readonly _onSettingsGistUrlChange = debounce((value: string) => {
 		console.info('Saved settings gist URL to local storage.')
-		localStorage.setItem(SETTINGS_GIST_URL, event.currentTarget.value)
-
-		// this.reload()
-		// fetch()
+		localStorage.setItem(storageKeys.settingsGistUrl, value)
+		this._loadSettingsAsync()
 	}, 1000)
 
 	constructor() {
 		super()
 
 		this.state = {
-			githubToken: localStorage.getItem(GITHUB_TOKEN) || '',
-			settingsGistUrl: localStorage.getItem(SETTINGS_GIST_URL) || '',
+			githubToken: localStorage.getItem(storageKeys.githubToken) || '',
+			settingsGistUrl: localStorage.getItem(storageKeys.settingsGistUrl) || '',
 			settings: defaultSettings,
 		}
 
 		this._onTokenChange = this._onTokenChange.bind(this)
 		this._onSettingsGistUrlChange = this._onSettingsGistUrlChange.bind(this)
 		this._getSettingsAsync = this._getSettingsAsync.bind(this)
-		this._reloadAsync = this._reloadAsync.bind(this)
+		this._loadSettingsAsync = this._loadSettingsAsync.bind(this)
+	}
+
+	public componentDidMount() {
+		// Can't await here
+		this._loadSettingsAsync()
 	}
 
 	public render() {
@@ -63,26 +49,60 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 			<div>
 				<h1>Innstillinger</h1>
 				<label>GitHub Token</label>
-				<input type='text' defaultValue={githubToken} onChange={this._onTokenChange} />
+				<input type='text' defaultValue={githubToken} onChange={ev => this._onTokenChange(ev.currentTarget.value)} />
 				<label>Settings Gist URL</label>
-				<input type='text' defaultValue={settingsGistUrl} onChange={this._onSettingsGistUrlChange} />
+				<input type='text' defaultValue={settingsGistUrl} onChange={ev => this._onSettingsGistUrlChange(ev.currentTarget.value)} />
 
 				<h1>Personer</h1>
+				{this.state.settings && this.state.settings.persons
+					? (<div>
+							{this.state.settings.persons.map(p => (
+							<div ref={p.personId}>
+								<p>{p.name} ({p.personId})</p>
+								<ul>{p.jokes.map((joke, jokeIdx) =>
+									(<li ref={jokeIdx.toString()}>{joke}</li>))}
+								</ul>
+							</div>))}
+						</div>)
+					: (<div>Ingen personer lastet..</div>)
+				}
 			</div>
 		)
 	}
 
-	private async _reloadAsync() {
-		const settings = await this._getSettingsAsync()
-		this.setState({ settings })
+	private async _loadSettingsAsync() {
+		try {
+			const gistUrl = localStorage.getItem(storageKeys.settingsGistUrl)
+			const token = localStorage.getItem(storageKeys.githubToken)
+			if (!gistUrl) {
+				console.warn('Cannot load settings. Gist URL not set.')
+				return
+			}
+			if (!token) {
+				console.warn('Cannot load settings. GitHub token not set.')
+				return
+			}
 
+			// 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
+			// Use rawgit.com to read JSON with correct content-type headers
+
+			const settings = await this._getSettingsAsync(gistUrl)
+			this.setState({ settings })
+		} catch (err) {
+			console.error('Failed to load settings.', err)
+		}
 	}
 
-	private async _getSettingsAsync(): Promise<Settings> {
-		const url = 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
-		const res = await fetch(url)
-		const ok = res.status >= 200 && res.status <= 300
-		if (!ok) {
+	private async _getSettingsAsync(gistUrl: string): Promise<Settings> {
+		// From: https://gist.github.com/angularsen/08998fe7673b485de800a4c1c1780e62
+		// To:   https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62
+		const matches = gistUrl.match(/gist.github.com\/(.*?)\/(.*?)\//)
+		if (!matches || matches.length <= 1) { return }
+
+		const [, username, gistId] = matches
+		const rawGitUrl = gistUrl.replace('gist.github.com', 'rawgit.com')
+		const res = await fetch(gistUrl)
+		if (!res.ok) {
 			console.warn('Failed to get settings.', res)
 			return defaultSettings
 		}
