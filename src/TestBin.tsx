@@ -25,21 +25,25 @@ class Component extends React.Component<{}, State> {
 		const buttonStyle = { padding: '1em', minWidth: '6em' }
 
 		return (
-			<div>
-				<h1>TestBin</h1>
-				<div>
-					<button style={buttonStyle} onClick={ev => this.speakRandomJoke()}>Insult me now!</button>
-					<button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>
-					<button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning()}>The big chief appears in the morning</button>
-					<button style={buttonStyle} onClick={ev => this.speakNorwegian()}>Si noe norsk</button>
-					<button style={buttonStyle} onClick={ev => this.speakEnglish()}>Say something English</button>
+			<div className='container'>
+				<div className='row'>
+					<div className='col'>
+						<h1>TestBin</h1>
+						<div>
+							<button style={buttonStyle} onClick={ev => this.speakRandomJoke()}>Insult me now!</button>
+							<button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>
+							<button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning()}>The big chief appears in the morning</button>
+							<button style={buttonStyle} onClick={ev => this.speakNorwegian()}>Si noe norsk</button>
+							<button style={buttonStyle} onClick={ev => this.speakEnglish()}>Say something English</button>
+						</div>
+						<p>
+							{this.state.textToSpeak ? this.state.textToSpeak : ''}
+						</p>
+						<p>
+							{this.state.error ? 'Error happened: ' + this.state.error : ''}
+						</p>
+					</div>
 				</div>
-				<p>
-					{this.state.textToSpeak ? this.state.textToSpeak : ''}
-				</p>
-				<p>
-					{this.state.error ? 'Error happened: ' + this.state.error : ''}
-				</p>
 			</div>
 		)
 	}

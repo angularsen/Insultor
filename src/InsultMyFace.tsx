@@ -220,44 +220,48 @@ class Component extends React.Component<any, State> {
 				)
 
 		return (
-			<div>
-				<div hidden={!this.state.isFaceApiActive}>
-					<Loader />
-				</div>
-				<div style={{ color: 'white', background: 'black', minHeight: '500px', width: '100%' }}>
-					{tmp}
-				</div>
+			<div className='container-fludi'>
+				<div className='row no-gutters'>
+					<div className='col'>
+						<div hidden={!this.state.isFaceApiActive}>
+							<Loader />
+						</div>
+						<div style={{ color: 'white', background: 'black', minHeight: '500px', width: '100%' }}>
+							{tmp}
+						</div>
 
-				<div style={{ color: stateStyle.color, background: stateStyle.background }}>
-					<p>Detection score: {this.state.motionScore}</p>
-					{trainingStatusDiv}
-					<div>
-						<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
-						<button style={buttonStyle} onClick={() => this._speakRandom()}>Si noe</button>
-						<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
-						<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
-						<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
+						<div style={{ color: stateStyle.color, background: stateStyle.background }}>
+							<p>Detection score: {this.state.motionScore}</p>
+							{trainingStatusDiv}
+							<div>
+								<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
+								<button style={buttonStyle} onClick={() => this._speakRandom()}>Si noe</button>
+								<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
+								<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
+								<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
+							</div>
+							<div className='camera'>
+								<video style={{ border: '1px solid lightgrey', width: '100%' }} id='video' ref={(video) => this._video = video || undefined}
+									onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
+							</div>
+							<div>
+								<canvas style={{ border: '1px solid lightgrey' }} id='diff-calc-canvas'
+									width={64} height={64}
+									ref={(canvas) => this._diffCalcCanvas = canvas || undefined}></canvas>
+								<canvas style={{ border: '1px solid lightgrey' }} id='diff-result-canvas'
+									width={64} height={64}
+									ref={(canvas) => this._diffResultCanvas = canvas || undefined}></canvas>
+							</div>
+							<div>
+								<canvas style={{ border: '1px solid lightgrey', width: '100%' }} id='faceapi-canvas'
+									width={this.state.videoWidth} height={this.state.videoHeight}
+									ref={(canvas) => this._faceDetectCanvas = canvas || undefined}></canvas>
+							</div>
+							<p>
+								{this.state.error ? 'Error happened: ' + this.state.error : ''}
+							</p>
+						</div>
 					</div>
-					<div className='camera'>
-						<video style={{ border: '1px solid lightgrey', width: '100%' }} id='video' ref={(video) => this._video = video || undefined}
-							onCanPlay={ev => this.videoOnCanPlay(ev)}>Video stream not available.</video>
-					</div>
-					<div>
-						<canvas style={{ border: '1px solid lightgrey' }} id='diff-calc-canvas'
-							width={64} height={64}
-							ref={(canvas) => this._diffCalcCanvas = canvas || undefined}></canvas>
-						<canvas style={{ border: '1px solid lightgrey' }} id='diff-result-canvas'
-							width={64} height={64}
-							ref={(canvas) => this._diffResultCanvas = canvas || undefined}></canvas>
-					</div>
-					<div>
-						<canvas style={{ border: '1px solid lightgrey', width: '100%' }} id='faceapi-canvas'
-						width={this.state.videoWidth} height={this.state.videoHeight}
-							ref={(canvas) => this._faceDetectCanvas = canvas || undefined}></canvas>
-					</div>
-					<p>
-						{this.state.error ? 'Error happened: ' + this.state.error : ''}
-					</p>
 				</div>
 			</div>
 		)

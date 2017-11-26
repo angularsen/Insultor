@@ -46,39 +46,43 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 		const { githubToken, settingsGistUrl } = this.state
 
 		return (
-			<div>
-				<h1>Innstillinger</h1>
-				<form>
-					<div className='form-group'>
-						<label htmlFor='githubToken'>'Token' for din GitHub konto</label>
-						<input id='githubToken' type='url' className='form-control'
-							defaultValue={githubToken}
-							placeholder='Get token from your github account'
-							onChange={ev => this._onTokenChange(ev.currentTarget.value)} />
-					</div>
+			<div className='container'>
+				<div className='row'>
+					<div className='col'>
+						<h1>Innstillinger</h1>
+						<form>
+							<div className='form-group'>
+								<label htmlFor='githubToken'>GitHub konto token</label>
+								<input id='githubToken' type='url' className='form-control'
+									defaultValue={githubToken}
+									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
+									onChange={ev => this._onTokenChange(ev.currentTarget.value)} />
+							</div>
 
-					<div className='form-group'>
-						<label htmlFor='gistUrl'>URL til gist for settings.json</label>
-						<input id='gistUrl' type='url' className='form-control'
-							defaultValue={settingsGistUrl}
-							placeholder='https://gist.github.com/{username}/{gist ID}'
-							onChange={ev => this._onSettingsGistUrlChange(ev.currentTarget.value)} />
-					</div>
-				</form>
+							<div className='form-group'>
+								<label htmlFor='gistUrl'>URL til gist for settings.json</label>
+								<input id='gistUrl' type='url' className='form-control'
+									defaultValue={settingsGistUrl}
+									placeholder='Eks: https://gist.github.com/{username}/{id}'
+									onChange={ev => this._onSettingsGistUrlChange(ev.currentTarget.value)} />
+							</div>
+						</form>
 
-				<h1>Personer</h1>
-				{this.state.settings && this.state.settings.persons
-					? (<div>
-							{this.state.settings.persons.map(p => (
-							<div key={p.personId}>
-								<p>{p.name} ({p.personId})</p>
-								<ul>{p.jokes.map((joke, jokeIdx) =>
-									(<li key={jokeIdx.toString()}>{joke}</li>))}
-								</ul>
-							</div>))}
-						</div>)
-					: (<div>Ingen personer lastet..</div>)
-				}
+						<h1>Personer</h1>
+						{this.state.settings && this.state.settings.persons
+							? (<div>
+								{this.state.settings.persons.map(p => (
+									<div key={p.personId}>
+										<p>{p.name} ({p.personId})</p>
+										<ul>{p.jokes.map((joke, jokeIdx) =>
+											(<li key={jokeIdx.toString()}>{joke}</li>))}
+										</ul>
+									</div>))}
+							</div>)
+							: (<div>Ingen personer lastet..</div>)
+						}
+					</div>
+				</div>
 			</div>
 		)
 	}
