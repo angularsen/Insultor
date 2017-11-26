@@ -77,5 +77,8 @@
     "url-loader": "^0.6.2",
     "webpack": "^3.8.1",
     "webpack-dev-middleware": "^1.12.1"
+  },
+  "resolutions": {
+    "tar": "4.0.2"
   }
 }
