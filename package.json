@@ -78,6 +78,6 @@
     "webpack-dev-middleware": "^1.12.1"
   },
   "resolutions": {
-    "tar": "4.0.2"
+    "tar": "2.2.1"
   }
 }
