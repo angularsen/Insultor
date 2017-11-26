@@ -11,9 +11,9 @@ interface State {
 	textToSpeak?: string
 }
 
-class Component extends React.Component<any, State> {
-	constructor() {
-		super()
+class Component extends React.Component<{}, State> {
+	constructor(props: {}) {
+		super(props)
 
 		this.state = {
 		}

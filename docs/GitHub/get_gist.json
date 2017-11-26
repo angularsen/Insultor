@@ -1,0 +1,195 @@
+{
+	"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62",
+	"forks_url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/forks",
+	"commits_url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/commits",
+	"id": "08998fe7673b485de800a4c1c1780e62",
+	"git_pull_url": "https://gist.github.com/08998fe7673b485de800a4c1c1780e62.git",
+	"git_push_url": "https://gist.github.com/08998fe7673b485de800a4c1c1780e62.git",
+	"html_url": "https://gist.github.com/08998fe7673b485de800a4c1c1780e62",
+	"files": {
+			"settings.json": {
+					"filename": "settings.json",
+					"type": "application/json",
+					"language": "JSON",
+					"raw_url": "https://gist.githubusercontent.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/e1c6f835967a0332b615e68b19066fd6b10967d0/settings.json",
+					"size": 540,
+					"truncated": false,
+					"content": "{\n\t\"persons\": [{\n\t\t\"personId\": \"1e797137-fa4c-4d2b-86e8-6032b1007a04\",\n\t\t\"photos\": [\n\t\t\t{ url: \"https://rawgit.com/angularsen/Insultor-DB-Test/master/Andreas-Gullberg-Larsen1.jpg\", width: 1000, height: 700 },\n\t\t\t{ url: \"https://rawgit.com/angularsen/Insultor-DB-Test/master/Andreas-Gullberg-Larsen2.jpg\", width: 300, height: 300 },\n\t\t],\n\t\t\"name\": \"Andreas Gullberg Larsen\",\n\t\t\"jokes\": [\n\t\t\t\"Sola skinte flott i dag..! Helt til DU kom inn døra.\",\n\t\t\t\"Hei, jeg tror du har noe i fjeset.. uren hud.\",\n\t\t\t\"I dag blir en jævlig dag.\"\n\t\t]\n\t}]\n}"
+			}
+	},
+	"public": false,
+	"created_at": "2017-11-09T21:00:52Z",
+	"updated_at": "2017-11-24T22:57:17Z",
+	"description": "Insultor settings for Andreas",
+	"comments": 0,
+	"user": null,
+	"comments_url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/comments",
+	"owner": {
+			"login": "angularsen",
+			"id": 787816,
+			"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+			"gravatar_id": "",
+			"url": "https://api.github.com/users/angularsen",
+			"html_url": "https://github.com/angularsen",
+			"followers_url": "https://api.github.com/users/angularsen/followers",
+			"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+			"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+			"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+			"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+			"organizations_url": "https://api.github.com/users/angularsen/orgs",
+			"repos_url": "https://api.github.com/users/angularsen/repos",
+			"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+			"received_events_url": "https://api.github.com/users/angularsen/received_events",
+			"type": "User",
+			"site_admin": false
+	},
+	"forks": [],
+	"history": [
+			{
+					"user": {
+							"login": "angularsen",
+							"id": 787816,
+							"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/angularsen",
+							"html_url": "https://github.com/angularsen",
+							"followers_url": "https://api.github.com/users/angularsen/followers",
+							"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+							"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+							"organizations_url": "https://api.github.com/users/angularsen/orgs",
+							"repos_url": "https://api.github.com/users/angularsen/repos",
+							"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/angularsen/received_events",
+							"type": "User",
+							"site_admin": false
+					},
+					"version": "706b39f4177934d3145648ce467e622737d3b91e",
+					"committed_at": "2017-11-24T22:57:16Z",
+					"change_status": {
+							"total": 4,
+							"additions": 4,
+							"deletions": 0
+					},
+					"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/706b39f4177934d3145648ce467e622737d3b91e"
+			},
+			{
+					"user": {
+							"login": "angularsen",
+							"id": 787816,
+							"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/angularsen",
+							"html_url": "https://github.com/angularsen",
+							"followers_url": "https://api.github.com/users/angularsen/followers",
+							"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+							"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+							"organizations_url": "https://api.github.com/users/angularsen/orgs",
+							"repos_url": "https://api.github.com/users/angularsen/repos",
+							"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/angularsen/received_events",
+							"type": "User",
+							"site_admin": false
+					},
+					"version": "4b355f1ce390af5a1a3267f3720bd91395f2a065",
+					"committed_at": "2017-11-12T22:32:26Z",
+					"change_status": {
+							"total": 22,
+							"additions": 11,
+							"deletions": 11
+					},
+					"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/4b355f1ce390af5a1a3267f3720bd91395f2a065"
+			},
+			{
+					"user": {
+							"login": "angularsen",
+							"id": 787816,
+							"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/angularsen",
+							"html_url": "https://github.com/angularsen",
+							"followers_url": "https://api.github.com/users/angularsen/followers",
+							"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+							"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+							"organizations_url": "https://api.github.com/users/angularsen/orgs",
+							"repos_url": "https://api.github.com/users/angularsen/repos",
+							"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/angularsen/received_events",
+							"type": "User",
+							"site_admin": false
+					},
+					"version": "677c643fb5aa23fbde3d9d932c8c79af3d3bc008",
+					"committed_at": "2017-11-12T22:27:09Z",
+					"change_status": {
+							"total": 11,
+							"additions": 6,
+							"deletions": 5
+					},
+					"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/677c643fb5aa23fbde3d9d932c8c79af3d3bc008"
+			},
+			{
+					"user": {
+							"login": "angularsen",
+							"id": 787816,
+							"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/angularsen",
+							"html_url": "https://github.com/angularsen",
+							"followers_url": "https://api.github.com/users/angularsen/followers",
+							"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+							"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+							"organizations_url": "https://api.github.com/users/angularsen/orgs",
+							"repos_url": "https://api.github.com/users/angularsen/repos",
+							"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/angularsen/received_events",
+							"type": "User",
+							"site_admin": false
+					},
+					"version": "354ca92a5971c40e3f81a813243dd6a742598035",
+					"committed_at": "2017-11-09T21:02:18Z",
+					"change_status": {
+							"total": 0,
+							"additions": 0,
+							"deletions": 0
+					},
+					"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/354ca92a5971c40e3f81a813243dd6a742598035"
+			},
+			{
+					"user": {
+							"login": "angularsen",
+							"id": 787816,
+							"avatar_url": "https://avatars1.githubusercontent.com/u/787816?v=4",
+							"gravatar_id": "",
+							"url": "https://api.github.com/users/angularsen",
+							"html_url": "https://github.com/angularsen",
+							"followers_url": "https://api.github.com/users/angularsen/followers",
+							"following_url": "https://api.github.com/users/angularsen/following{/other_user}",
+							"gists_url": "https://api.github.com/users/angularsen/gists{/gist_id}",
+							"starred_url": "https://api.github.com/users/angularsen/starred{/owner}{/repo}",
+							"subscriptions_url": "https://api.github.com/users/angularsen/subscriptions",
+							"organizations_url": "https://api.github.com/users/angularsen/orgs",
+							"repos_url": "https://api.github.com/users/angularsen/repos",
+							"events_url": "https://api.github.com/users/angularsen/events{/privacy}",
+							"received_events_url": "https://api.github.com/users/angularsen/received_events",
+							"type": "User",
+							"site_admin": false
+					},
+					"version": "c12449cb619e6930d03488f70d9a04642f87179d",
+					"committed_at": "2017-11-09T21:00:52Z",
+					"change_status": {
+							"total": 10,
+							"additions": 10,
+							"deletions": 0
+					},
+					"url": "https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62/c12449cb619e6930d03488f70d9a04642f87179d"
+			}
+	],
+	"truncated": false
+}

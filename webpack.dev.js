@@ -23,13 +23,26 @@ module.exports = {
       // All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
       { test: /\.js$/, include: srcDir, loader: ['babel-loader', 'source-map-loader'], enforce: 'pre' },
       {
-        test: /\.css$/,
-        include: srcDir,
+        test: /\.css$/, // for application CSS
+        include: [srcDir],
         loader: [
           'style-loader',
           'typings-for-css-modules-loader?modules&importLoaders=1&localIdentName=[name]__[local]___[hash:base64:5]&namedExport&camelCase',
         ]
-      }
+      },
+      {
+        test: /\.css$/, // for node_modules CSS
+        exclude: [srcDir],
+        loader: [
+          'style-loader',
+          'css-loader?modules&importLoaders=1&localIdentName=[name]__[local]___[hash:base64:5]&namedExport&camelCase',
+        ]
+      },
+      { test: /\.woff(\?.+)?$/, use: 'url-loader?limit=10000&mimetype=application/font-woff' },
+      { test: /\.woff2(\?.+)?$/, use: 'url-loader?limit=10000&mimetype=application/font-woff' },
+      { test: /\.ttf(\?.+)?$/, use: 'file-loader' },
+      { test: /\.eot(\?.+)?$/, use: 'file-loader' },
+      { test: /\.svg(\?.+)?$/, use: 'file-loader' },
     ]
   },
   plugins: [

@@ -110,8 +110,8 @@ class Component extends React.Component<any, State> {
 	 */
 	private _video?: HTMLVideoElement
 
-	constructor() {
-		super()
+	constructor(props: any) {
+		super(props)
 
 		this.state = {
 			commentatorEmoji: '😶',
