@@ -1,5 +1,7 @@
 import * as React from 'react'
 import { debounce } from 'underscore'
+import { faceApiConfig } from './services/constants'
+import FaceApi from './services/MicrosoftFaceApi'
 import { defaultSettings, Settings } from './services/Settings'
 
 /** localStorage key names */
@@ -8,17 +10,24 @@ const storageKeys = {
 	settingsGistUrl: 'GIST_URL',
 }
 
-class Component extends React.Component<{}, { githubToken: string, settingsGistUrl: string, settings: Settings }> {
+class Component extends React.Component<{}, { settings: Settings }> {
+	private _settingsGistUrl?: string = localStorage.getItem(storageKeys.settingsGistUrl) || undefined
+	private _githubToken?: string = localStorage.getItem(storageKeys.githubToken) || undefined
+	private _addFirstName: HTMLInputElement | null
+	private _addLastName: HTMLInputElement | null
+	private _addNickname: HTMLInputElement | null
 
 	private readonly _onTokenChange = debounce((value: string) => {
 		console.info('Saved github token to local storage.')
 		localStorage.setItem(storageKeys.githubToken, value)
+		this._githubToken = value
 		this._loadSettingsAsync()
 	}, 1000)
 
 	private readonly _onSettingsGistUrlChange = debounce((value: string) => {
 		console.info('Saved settings gist URL to local storage.')
 		localStorage.setItem(storageKeys.settingsGistUrl, value)
+		this._settingsGistUrl = value
 		this._loadSettingsAsync()
 	}, 1000)
 
@@ -26,8 +35,6 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 		super(props)
 
 		this.state = {
-			githubToken: localStorage.getItem(storageKeys.githubToken) || '',
-			settingsGistUrl: localStorage.getItem(storageKeys.settingsGistUrl) || '',
 			settings: defaultSettings,
 		}
 
@@ -43,8 +50,6 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 	}
 
 	public render() {
-		const { githubToken, settingsGistUrl } = this.state
-
 		return (
 			<div className='container'>
 				<div className='row'>
@@ -54,7 +59,7 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub konto token</label>
 								<input id='githubToken' type='url' className='form-control'
-									defaultValue={githubToken}
+									defaultValue={this._githubToken}
 									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
 									onChange={ev => this._onTokenChange(ev.currentTarget.value)} />
 							</div>
@@ -62,13 +67,28 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 							<div className='form-group'>
 								<label htmlFor='gistUrl'>URL til gist for settings.json</label>
 								<input id='gistUrl' type='url' className='form-control'
-									defaultValue={settingsGistUrl}
+									defaultValue={this._settingsGistUrl}
 									placeholder='Eks: https://gist.github.com/{username}/{id}'
 									onChange={ev => this._onSettingsGistUrlChange(ev.currentTarget.value)} />
 							</div>
 						</form>
 
 						<h1>Personer</h1>
+						<form>
+							<div className='form-group'>
+								<label htmlFor='addFirstName'>Fornavn</label>
+								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola' ref={(x) => this._addFirstName = x} />
+							</div>
+							<div className='form-group'>
+								<label htmlFor='addLastName'>Etternavn</label>
+								<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann' ref={(x) => this._addLastName = x} />
+							</div>
+							<div className='form-group'>
+								<label htmlFor='addNickname'>Kallenavn</label>
+								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola' ref={(x) => this._addNickname = x} />
+							</div>
+							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()}>➕ Opprett</button>
+						</form>
 						{this.state.settings && this.state.settings.persons
 							? (<div>
 								{this.state.settings.persons.map(p => (
@@ -89,35 +109,42 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 
 	private async _loadSettingsAsync() {
 		try {
-			const gistUrl = localStorage.getItem(storageKeys.settingsGistUrl)
-			const token = localStorage.getItem(storageKeys.githubToken)
-			if (!gistUrl) {
-				console.warn('Cannot load settings. Gist URL not set.')
-				return
-			}
-			if (!token) {
-				console.warn('Cannot load settings. GitHub token not set.')
-				return
-			}
-
-			// 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
-			// Use rawgit.com to read JSON with correct content-type headers
-
-			const settings = await this._getSettingsAsync(gistUrl)
+			const settings = await this._getSettingsAsync()
 			this.setState({ settings })
 		} catch (err) {
 			console.error('Failed to load settings.', err)
 		}
 	}
 
-	private async _getSettingsAsync(gistUrl: string): Promise<Settings> {
-		// From: https://gist.github.com/angularsen/08998fe7673b485de800a4c1c1780e62
-		// To:   https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62
-		const matches = gistUrl.match(/gist\.github\.com\/(\w+)\/(\w+)/)
-		if (!matches) { throw new Error('Did not recognize gist URL: ' + gistUrl) }
+	private async _saveSettingsAsync(settings: Settings): Promise<void> {
+		const token = this._githubToken
+		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
 
-		const [, username, gistId] = matches
-		const apiUrl = `https://api.github.com/gists/${gistId}`
+		const apiUrl = this._getSettingsApiUrl()
+		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json gist URL is set.') }
+
+		const headers = new Headers()
+		headers.append('Authorization', `Bearer ${this._githubToken}`)
+		headers.append('Accept', 'application/json')
+		headers.append('Content-Type', 'application/json')
+
+		const body = JSON.stringify({
+			files: {
+				'settings.json': {
+					content: JSON.stringify(settings, null, 2),
+				},
+			},
+		}, null, 2)
+
+		const saveRes = await fetch(apiUrl, { method: 'PATCH', headers, body })
+		if (!saveRes.ok) {
+			throw new Error(`Failed to save settings: ${saveRes.status} ${saveRes.statusText} ${await saveRes.text()}`)
+		}
+	}
+
+	private async _getSettingsAsync(): Promise<Settings> {
+		const apiUrl = this._getSettingsApiUrl()
+		if (!apiUrl) { return defaultSettings }
 
 		const gistRes = await fetch(apiUrl)
 		if (!gistRes.ok) {
@@ -127,12 +154,6 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 
 		const gistBody = await gistRes.json()
 		const settingsRawUrl = gistBody.files['settings.json'].raw_url
-
-		// Get a rawgit.com URL that provides the correct Content-Type headers
-		// tslint:disable-next-line:max-line-length
-		// From: https://gist.githubusercontent.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/e1c6f835967a0332b615e68b19066fd6b10967d0/settings.json
-		// To: https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/e1c6f835967a0332b615e68b19066fd6b10967d0/settings.json
-		// const settingsRawGitUrl = settingsRawUrl.replace('gist.githubusercontent.com', 'rawgit.com')
 
 		const settingsRes = await fetch(settingsRawUrl)
 		const settings: Settings = await settingsRes.json()
@@ -144,6 +165,45 @@ class Component extends React.Component<{}, { githubToken: string, settingsGistU
 		console.info('Loaded settings.', settings)
 		return settings
 	}
+
+	private async _createPersonAsync(): Promise<void> {
+		const firstName = this._addFirstName && this._addFirstName.value
+		const lastName = this._addLastName && this._addLastName.value
+		const nickname = this._addNickname && this._addNickname.value
+		if (!firstName || !lastName || !nickname) {
+			alert('Fyll inn alle felter først.')
+			return
+		}
+
+		const name = `${firstName} ${lastName}`
+		const faceApi = new FaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId)
+		const createPersonRes = await faceApi.createPersonAsync(name)
+		const personId = createPersonRes.personId
+
+		const settings = await this._getSettingsAsync()
+		if (settings.persons.find(p => p.personId === personId)) {
+			throw new Error('Person with same ID is already added.')
+		}
+
+		settings.persons.push({ name, jokes: [], personId, photos: [] })
+
+		await this._saveSettingsAsync(settings)
+	}
+
+	private _getSettingsApiUrl(): string | undefined {
+		const gistUrl = this._settingsGistUrl
+		if (!gistUrl) return undefined
+
+		// From: https://gist.github.com/angularsen/08998fe7673b485de800a4c1c1780e62
+		// To:   https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62
+		const matches = gistUrl.match(/gist\.github\.com\/(\w+)\/(\w+)/)
+		if (!matches) { throw new Error('Did not recognize gist URL: ' + gistUrl) }
+
+		const [, username, gistId] = matches
+		const apiUrl = `https://api.github.com/gists/${gistId}`
+		return apiUrl
+	}
+
 }
 
 export default Component

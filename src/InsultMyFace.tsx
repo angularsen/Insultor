@@ -6,6 +6,7 @@ import PersonGroupTrainingStatus from '../docs/FaceAPI/PersonGroupTrainingStatus
 import Loader from './components/loader'
 import { default as Commentator, DeliverCommentData, State as CommentatorState } from './services/Commentator'
 import CommentProvider from './services/CommentProvider'
+import { faceApiConfig } from './services/constants'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import { default as PresenceDetector } from './services/PresenceDetector'
 import { defaultSettings, Settings } from './services/Settings'
@@ -15,12 +16,6 @@ import { VideoService } from './services/VideoService'
 
 const VIDEO_WIDTH = 600
 const VIDEO_HEIGHT = 600
-
-const faceApiConfig = {
-	endpoint: 'https://northeurope.api.cognitive.microsoft.com/face/v1.0/',
-	myPersonalSubscriptionKey: 'e3778e3dab7c46bba4b0af4dcd3df272',
-	webstepPersonGroupId: 'insultor-webstep-trd',
-}
 
 const speech = new Speech()
 
@@ -47,10 +42,10 @@ function getStateStyle(commentator: Commentator): StateStyle {
 }
 
 async function getSettingsAsync(): Promise<Settings> {
+	// TODO Use URL from localStorage
 	const url = 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
 	const res = await fetch(url)
-	const ok = res.status >= 200 && res.status <= 300
-	if (!ok) {
+	if (!res.ok) {
 		console.warn('Failed to get settings.', res)
 		return defaultSettings
 	}
