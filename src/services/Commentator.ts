@@ -591,21 +591,21 @@ export class Commentator {
 				this._hasIdentifiedFacesInCurrentPresence = true
 			}
 
-			const anonymousPersons: IdentifiedPerson[] = await Promise.all(
-				unidentifiedFaces.map(async (faceWithImageData) => {
-					console.info(`Create anonymous person for face [${faceWithImageData.faceId}].`)
+			// const anonymousPersons: IdentifiedPerson[] = await Promise.all(
+			// 	unidentifiedFaces.map(async (faceWithImageData) => {
+			// 		console.info(`Create anonymous person for face [${faceWithImageData.faceId}].`)
 
-					this._onHasFaceApiActivityDispatcher.dispatch(true)
-					const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
-					this._onHasFaceApiActivityDispatcher.dispatch(false)
+			// 		this._onHasFaceApiActivityDispatcher.dispatch(true)
+			// 		const anonymousPerson = await this._faceApi.createAnonymousPersonWithFacesAsync([faceWithImageData.imageDataUrl])
+			// 		this._onHasFaceApiActivityDispatcher.dispatch(false)
 
-					return {
-						confidence: 1,
-						detectedFace: faceWithImageData,
-						person: anonymousPerson,
-						personId: anonymousPerson.personId,
-					}
-				}))
+			// 		return {
+			// 			confidence: 1,
+			// 			detectedFace: faceWithImageData,
+			// 			person: anonymousPerson,
+			// 			personId: anonymousPerson.personId,
+			// 		}
+			// 	}))
 
 			console.debug(`Get person info for ${input.detectedFaces.length} faces...`)
 
@@ -627,25 +627,25 @@ export class Commentator {
 				}
 			}))
 
-			const faceComments = anonymousPersons.map((person, i): DeliverCommentInput => {
-				const faceId = person.detectedFace.faceId
-				const imageData = input.detectedFaces.find(df => df.faceId === faceId)
-				if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
+			// const faceComments = anonymousPersons.map((person, i): DeliverCommentInput => {
+			// 	const faceId = person.detectedFace.faceId
+			// 	const imageData = input.detectedFaces.find(df => df.faceId === faceId)
+			// 	if (!imageData) { throw new Error('Could not find image data for face ID: ' + faceId) }
 
-				const comment = this._commentProvider.getCommentForPerson({
-					face: person.detectedFace.result,
-					person: person.person,
-				})
+			// 	const comment = this._commentProvider.getCommentForPerson({
+			// 		face: person.detectedFace.result,
+			// 		person: person.person,
+			// 	})
 
-				const result: DeliverCommentInput = {
-					comment,
-					faceId,
-					imageDataUrl: imageData.imageDataUrl,
-					name: person.person.name,
-					person: person.person,
-				}
-				return result
-			})
+			// 	const result: DeliverCommentInput = {
+			// 		comment,
+			// 		faceId,
+			// 		imageDataUrl: imageData.imageDataUrl,
+			// 		name: person.person.name,
+			// 		person: person.person,
+			// 	}
+			// 	return result
+			// })
 
 			const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
 				const faceId = idPerson.detectedFace.faceId
@@ -667,7 +667,7 @@ export class Commentator {
 				return result
 			})
 
-			const commentInputs = personComments.concat(faceComments)
+			const commentInputs = personComments //.concat(faceComments)
 
 			if (commentInputs.length > 0) {
 				this._setStatus('Hør nå her', '😎')
@@ -726,7 +726,16 @@ export class Commentator {
 			this._onHasFaceApiActivityDispatcher.dispatch(false)
 			console.debug(`Identifying ${facesToIdentify.length} faces...Complete.`)
 
-			// Identified faces (or not, commenting will handle anonymous faces)
+			// TODO Rewrite state machine to store identify face results in a queue, with unidentified faces first
+			// * If any unidentified faces: go to ProcessUnidentifiedFaces
+			// * If only identified faces: go to DeliverComments
+			// * ProcessUnidentifiedFaces:
+			//   * Stop face detector
+			//   * For each face show photo and yes/not now/never buttons to register with a visible timeout
+			//     * If yes: upload photo and register person with photo
+			//     * If not now: continue to next face
+			//     * If never: ask user to verify we can store anonymous face characteristics, create person with photo (do not upload photo to storage)
+			//   * If any identified faces: go to DeliverComments
 			this.facesIdentified({
 				detectedFaces: facesToIdentify,
 				identifiedFaces: identifyFacesResponse,
