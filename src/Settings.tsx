@@ -92,11 +92,16 @@ class Component extends React.Component<{}, { settings: Settings }> {
 						{this.state.settings && this.state.settings.persons
 							? (<div>
 								{this.state.settings.persons.map(p => (
-									<div key={p.personId}>
-										<p>{p.name} ({p.personId})</p>
-										<ul>{p.jokes.map((joke, jokeIdx) =>
-											(<li key={jokeIdx.toString()}>{joke}</li>))}
-										</ul>
+									<div key={p.personId} className='card' style={{width: '20rem'}}>
+										<img className='card-img-top' src={_.min(p.photos, photo => photo.width).url} alt='Person photo' />
+										<div className='card-block'>
+											<h4 className='card-title'>{p.name}</h4>
+											<p className='card-text'>({p.personId})</p>
+											<ul>{p.jokes.map((joke, jokeIdx) =>
+												(<li key={jokeIdx.toString()}>{joke}</li>))}
+											</ul>
+											<a href="#" className='btn btn-primary'>Go somewhere</a>
+										</div>
 									</div>))}
 							</div>)
 							: (<div>Ingen personer lastet..</div>)
