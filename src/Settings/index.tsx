@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { debounce, min } from 'underscore'
+import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
 import FaceApi from '../services/MicrosoftFaceApi'
 import { defaultSettings, Settings } from '../services/Settings'
@@ -79,6 +80,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 
 						<h2>Personer</h2>
 						<form>
+							<Selfie desiredWidth={1920} desiredHeight={1080} />
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
 								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola' ref={(x) => this._addFirstName = x} />
