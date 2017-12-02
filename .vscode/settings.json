@@ -2,5 +2,5 @@
     "editor.insertSpaces": false,
     "editor.tabSize": 2,
     "files.autoSave": "off",
-    "tslint.autoFixOnSave": true,
+    "tslint.autoFixOnSave": true
 }

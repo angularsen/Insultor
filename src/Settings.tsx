@@ -54,7 +54,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 			<div className='container'>
 				<div className='row'>
 					<div className='col'>
-						<h1>Innstillinger</h1>
+						<h1 className='display-4'>Instillinger</h1>
 						<form>
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub konto token</label>
@@ -73,7 +73,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 							</div>
 						</form>
 
-						<h1>Personer</h1>
+						<h2>Personer</h2>
 						<form>
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>

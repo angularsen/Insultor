@@ -14,7 +14,7 @@
         "options": "allow-leading-underscore"
     },
     "curly": [true, "ignore-same-line"],
-    "max-line-length": [true, 140],
+    "max-line-length": [true, 160],
     "no-var-requires": false,
     "interface-name": false,
     "no-console": false,

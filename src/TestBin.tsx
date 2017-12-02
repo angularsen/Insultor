@@ -28,7 +28,7 @@ class Component extends React.Component<{}, State> {
 			<div className='container'>
 				<div className='row'>
 					<div className='col'>
-						<h1>TestBin</h1>
+						<h1 className='display-4'>TestBin</h1>
 						<div>
 							<button style={buttonStyle} onClick={ev => this.speakRandomJoke()}>Insult me now!</button>
 							<button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>

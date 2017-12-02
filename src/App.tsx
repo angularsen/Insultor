@@ -60,7 +60,7 @@ const Header: React.StatelessComponent<{}> = () => (
 						<img style={navBarLogoStyle} src='img/logo-50p-square-white-trans.png' /></NavLink></li>
 				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/testbin'>TestBin</NavLink></li>
 				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/settings'>Innstillinger</NavLink></li>
-				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/about'>About</NavLink></li>
+				<li style={navBarItemStyle}><NavLink style={navBarLinkStyle} activeStyle={activeLinkStyle} to='/about'>Om</NavLink></li>
 			</ul>
 		</nav>
 		<div style={{ clear: 'both' }}></div>
