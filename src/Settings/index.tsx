@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { debounce, min } from 'underscore'
-import { faceApiConfig } from './services/constants'
-import FaceApi from './services/MicrosoftFaceApi'
-import { defaultSettings, Settings } from './services/Settings'
+import { faceApiConfig } from '../services/constants'
+import FaceApi from '../services/MicrosoftFaceApi'
+import { defaultSettings, Settings } from '../services/Settings'
+import PersonList from './PersonList'
 
 /** localStorage key names */
 const storageKeys = {
@@ -50,6 +51,9 @@ class Component extends React.Component<{}, { settings: Settings }> {
 	}
 
 	public render() {
+		const { settings } = this.state
+		const persons = settings && settings.persons
+
 		return (
 			<div className='container'>
 				<div className='row'>
@@ -90,31 +94,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()}>➕ Opprett</button>
 						</form>
 
-						{this.state.settings && this.state.settings.persons
-							? (<div>
-								{this.state.settings.persons.map(p => (
-									<div key={p.personId} className='card' style={{width: '21rem'}}>
-
-										<div style={{ display: 'flex' }}>
-											<img className='border' style={{ width: '5em', alignSelf: 'baseline' }}
-												src={min(p.photos, photo => photo.width).url} alt='Person photo' />
-											<div className='' style={{padding: '.5em'}}>
-												<h5 className='card-title'>{p.name}</h5>
-												<p className='text-muted'><small style={{fontSize: '50%'}}>{p.personId}</small></p>
-											</div>
-										</div>
-
-										<div className='card-body' style={{fontSize: '.7em'}}>
-											<ul style={{ listStyle: 'none', paddingLeft: 0 }}>{p.jokes.map((joke, jokeIdx) =>
-												(<li key={jokeIdx.toString()}>{joke}</li>))}
-											</ul>
-											<a href='#' className='btn btn-primary'>Endre</a>
-										</div>
-
-									</div>))}
-							</div>)
-							: (<div>Ingen personer lastet..</div>)
-						}
+						<PersonList persons={persons} />
 
 					</div>
 				</div>
