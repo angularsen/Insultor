@@ -1,5 +1,19 @@
 import { Cached, getOrSetAsync, set } from './Cache'
 
+// Copied from https://stackoverflow.com/a/30106551/134761
+// Handles Unicode
+function b64EncodeUnicode(str: string) {
+	return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+			return String.fromCharCode(parseInt(p1, 16))
+	}))
+}
+
+function b64DecodeUnicode(str: string) {
+	return decodeURIComponent(Array.prototype.map.call(atob(str), (c: string) => {
+			return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+	}).join(''))
+}
+
 export interface Settings {
 	persons: PersonSettings[]
 }
@@ -108,7 +122,7 @@ export class SettingsStore {
 		if (body.encoding !== 'base64') { throw new Error('Unknown encoding in settings.json: ' + body.encoding) }
 
 		// Content is base64 encoded JSON
-		const settings: Settings = JSON.parse(atob(body.content))
+		const settings: Settings = JSON.parse(b64DecodeUnicode(body.content))
 
 		// TODO Validate more in depth
 		if (!settings || !settings.persons || settings.persons.constructor !== Array) {
