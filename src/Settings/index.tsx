@@ -78,7 +78,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
 							</div>
 
-							<button className='btn btn-default' onClick={() => this._loadSettingsAsync(true)}>Last innstillinger</button>
+							<button className='btn btn-default' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
 						</form>
 
 						<h2>Personer</h2>
