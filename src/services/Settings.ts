@@ -29,6 +29,7 @@ export interface Photo {
 	url: string
 	width: number
 	height: number
+
 }
 
 export const defaultSettings: Settings = {
@@ -49,10 +50,40 @@ const getDefaultHeaders = (token: string) => {
 	return headers
 }
 
+// TODO Complete this
+interface GitHubCreateFileResult {
+	content: {
+		download_url: string,
+	},
+	commit: any,
+	message: string,
+}
+
 export class SettingsStore {
 	private readonly _settingsCache = new Cached<Settings | undefined>(localStorageKeys.settings, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
 
 	constructor(public githubApiToken?: string, public githubRepoUrl?: string) { }
+
+	public async uploadImageByDataUrlAsync(imageDataUrl: string, remoteFilePath: string): Promise<GitHubCreateFileResult> {
+		const apiUrl = this._getFileApiUrl(remoteFilePath)
+		if (!apiUrl) { throw new Error('No GitHub repo URL.') }
+
+		const token = this.githubApiToken
+		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
+
+		const method = 'PUT'
+		const headers = getDefaultHeaders(token)
+		const body = {
+			message: 'Upload photo.',
+			content: b64EncodeUnicode(imageDataUrl),
+		}
+		console.info(`Upload photo to ${apiUrl}...`)
+		const res = await fetch(`${apiUrl}/`, { method, headers, body })
+		if (!res.ok) { throw new Error(`Failed to upload photo: ${apiUrl} (${res.status} ${res.statusText}`) }
+
+		console.info(`Upload photo to ${apiUrl}...OK`)
+		return res.json()
+	}
 
 	public async getSettingsAsync(force = false): Promise<Settings> {
 		const settings = await this._settingsCache.getValueAsync(force)
@@ -63,7 +94,7 @@ export class SettingsStore {
 		const token = this.githubApiToken
 		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
 
-		const apiUrl = this._getSettingsApiUrl()
+		const apiUrl = this._getFileApiUrl('settings.json')
 		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json GitHub repo URL is set.') }
 
 		const headers = getDefaultHeaders(token)
@@ -83,7 +114,7 @@ export class SettingsStore {
 		this._settingsCache.setValue(settings)
 	}
 
-	private _getSettingsApiUrl(): string | undefined {
+	private _getFileApiUrl(remoteFilePath: string): string | undefined {
 		const repoUrl = this.githubRepoUrl
 		if (!repoUrl) return undefined
 
@@ -93,11 +124,11 @@ export class SettingsStore {
 		if (!matches) { throw new Error('Did not recognize GitHub repo URL: ' + repoUrl) }
 
 		const [, username, repo] = matches
-		return `https://api.github.com/repos/${username}/${repo}/contents/settings.json`
+		return `https://api.github.com/repos/${username}/${repo}/contents/${remoteFilePath}`
 	}
 
 	private async _fetchSettingsAsync(): Promise<Settings | undefined> {
-		const apiUrl = this._getSettingsApiUrl()
+		const apiUrl = this._getFileApiUrl('settings.json')
 		if (!apiUrl) {
 			console.warn('No API url.')
 			return undefined

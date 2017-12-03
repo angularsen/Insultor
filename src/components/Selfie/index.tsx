@@ -25,8 +25,11 @@ function visibleStyle<T>(val: T, ...args: T[]): { display?: 'none' } {
 // }
 
 class Component extends React.Component<Props, State> {
+	public photoHeight?: number
+	public photoWidth?: number
+	public photoDataUrl?: string
+
 	private _videoStream?: MediaStream
-	private _photoDataUrl?: string
 	private _photoContext?: CanvasRenderingContext2D
 	private _photoCanvas?: HTMLCanvasElement
 	private _video?: HTMLVideoElement
@@ -62,7 +65,7 @@ class Component extends React.Component<Props, State> {
 				}}
 					ref={(video) => this._video = video || undefined}>Video stream not available.</video>
 
-				<canvas style={{ background: '#666', width: '100%', ...visibleStyle(state, 'captured') }}
+				<canvas style={{ background: '#666', width: '100%', ...visibleStyle(state, 'captured', 'accepted') }}
 					width={videoWidth} height={videoHeight}
 					ref={(canvas) => this._photoCanvas = canvas || undefined}></canvas>
 
@@ -81,8 +84,8 @@ class Component extends React.Component<Props, State> {
 
 					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}
 						onClick={() => this._startAsync()}>Prøv igjen</button>
-						{this._photoDataUrl
-							? (<a href={this._photoDataUrl || 'javascript:void(0)'} download='wow_you_look_great.jpg' role='button'
+						{this.photoDataUrl
+							? (<a href={this.photoDataUrl || 'javascript:void(0)'} download='wow_you_look_great.jpg' role='button'
 									className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}>Last ned</a>)
 							: undefined
 						}
@@ -97,8 +100,9 @@ class Component extends React.Component<Props, State> {
 		if (!this._video) { console.error('No video element.'); return }
 
 		this._photoContext.drawImage(this._video, 0, 0, this.state.videoWidth, this.state.videoHeight)
-		// this._photoDataUrl = this._photoCanvas.toDataURL('image/png')
-		this._photoDataUrl = this._photoCanvas.toDataURL('image/jpeg', 1.0)
+		this.photoDataUrl = this._photoCanvas.toDataURL('image/jpeg', 1.0)
+		this.photoWidth = this.state.videoWidth
+		this.photoHeight = this.state.videoHeight
 		this._stopCamera()
 		this.setState({ state: 'captured' })
 	}

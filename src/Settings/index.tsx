@@ -13,8 +13,7 @@ const storageKeys = {
 }
 
 class Component extends React.Component<{}, { settings: Settings }> {
-	// private _settingsGistUrl?: string = localStorage.getItem(storageKeys.settingsGistUrl) || undefined
-	// private _githubToken?: string = localStorage.getItem(storageKeys.githubToken) || undefined
+	private _selfie: Selfie | null
 	private _addFirstName: HTMLInputElement | null
 	private _addLastName: HTMLInputElement | null
 	private _addNickname: HTMLInputElement | null
@@ -83,7 +82,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 
 						<h2>Personer</h2>
 						<form>
-							<Selfie desiredWidth={1920} desiredHeight={1080} />
+							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} />
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
 								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola' ref={(x) => this._addFirstName = x} />
@@ -122,8 +121,17 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const firstName = this._addFirstName && this._addFirstName.value
 		const lastName = this._addLastName && this._addLastName.value
 		const nickname = this._addNickname && this._addNickname.value
+		if (!this._selfie) {
+			alert('Fotoboks er ikke klar enda.')
+			return
+		}
 		if (!firstName || !lastName || !nickname) {
 			alert('Fyll inn alle felter først.')
+			return
+		}
+		const { photoDataUrl, photoWidth, photoHeight } = this._selfie
+		if (!photoDataUrl || !photoWidth || !photoHeight) {
+			alert('Ta bilde først.')
 			return
 		}
 
@@ -132,12 +140,25 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const createPersonRes = await faceApi.createPersonAsync(name)
 		const personId = createPersonRes.personId
 
+		// TODO Increase filename index when files exist
+		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/001-300x300.jpg"
+		const remoteFilePath = `${name} (${personId})/001-${photoWidth}-${photoHeight}.jpg`
+		const uploadedImageFile = await settingsStore.uploadImageByDataUrlAsync(photoDataUrl, remoteFilePath)
+
 		const settings = await settingsStore.getSettingsAsync()
+
 		if (settings.persons.find(p => p.personId === personId)) {
 			throw new Error('Person with same ID is already added.')
 		}
 
-		settings.persons.push({ name, jokes: [], personId, photos: [] })
+		settings.persons.push({
+			name,
+			jokes: [],
+			personId,
+			photos: [
+				{ url: uploadedImageFile.content.download_url, height: photoHeight, width: photoWidth },
+			],
+		})
 
 		await settingsStore.saveSettingsAsync(settings)
 	}
