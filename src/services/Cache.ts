@@ -6,11 +6,18 @@ interface Entry<T> {
 	value: T
 }
 
-class Cached<T> {
+export class Cached<T> {
 	public readonly expires: Date
 
 	constructor(public readonly cacheKey: string, public readonly maxAgeMs: number, private readonly _factory: () => Promise<T>) {}
-	public getValueAsync(): Promise<T> {
+
+	public async getValueAsync(force = false): Promise<T> {
+		if (force) {
+			const value = await this._factory()
+			this.setValue(value)
+			return value
+		}
+
 		return getOrSetAsync(this.cacheKey, this.maxAgeMs, this._factory)
 	}
 

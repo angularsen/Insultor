@@ -3,33 +3,33 @@ import { debounce, min } from 'underscore'
 import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
 import FaceApi from '../services/MicrosoftFaceApi'
-import { defaultSettings, Settings } from '../services/Settings'
+import { defaultSettings, Settings, settingsStore } from '../services/Settings'
 import PersonList from './PersonList'
 
 /** localStorage key names */
 const storageKeys = {
 	githubToken: 'GITHUB_GISTS_TOKEN',
-	settingsGistUrl: 'GIST_URL',
+	githubRepoUrl: 'GIST_URL',
 }
 
 class Component extends React.Component<{}, { settings: Settings }> {
-	private _settingsGistUrl?: string = localStorage.getItem(storageKeys.settingsGistUrl) || undefined
-	private _githubToken?: string = localStorage.getItem(storageKeys.githubToken) || undefined
+	// private _settingsGistUrl?: string = localStorage.getItem(storageKeys.settingsGistUrl) || undefined
+	// private _githubToken?: string = localStorage.getItem(storageKeys.githubToken) || undefined
 	private _addFirstName: HTMLInputElement | null
 	private _addLastName: HTMLInputElement | null
 	private _addNickname: HTMLInputElement | null
 
-	private readonly _onTokenChange = debounce((value: string) => {
-		console.info('Saved github token to local storage.')
+	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
+		console.info('Saved github API token to localstorage.')
 		localStorage.setItem(storageKeys.githubToken, value)
-		this._githubToken = value
+		settingsStore.githubApiToken = value
 		this._loadSettingsAsync()
 	}, 1000)
 
-	private readonly _onSettingsGistUrlChange = debounce((value: string) => {
-		console.info('Saved settings gist URL to local storage.')
-		localStorage.setItem(storageKeys.settingsGistUrl, value)
-		this._settingsGistUrl = value
+	private readonly _onGitHubRepoUrlChange = debounce((value: string) => {
+		console.info('Saved GitHub repo URL to localstorage.')
+		localStorage.setItem(storageKeys.githubRepoUrl, value)
+		settingsStore.githubRepoUrl = value
 		this._loadSettingsAsync()
 	}, 1000)
 
@@ -40,9 +40,10 @@ class Component extends React.Component<{}, { settings: Settings }> {
 			settings: defaultSettings,
 		}
 
-		this._onTokenChange = this._onTokenChange.bind(this)
-		this._onSettingsGistUrlChange = this._onSettingsGistUrlChange.bind(this)
-		this._getSettingsAsync = this._getSettingsAsync.bind(this)
+		settingsStore.githubApiToken = localStorage.getItem(storageKeys.githubToken) || undefined
+		settingsStore.githubRepoUrl = localStorage.getItem(storageKeys.githubRepoUrl) || undefined
+		this._onGitHubApiTokenChange = this._onGitHubApiTokenChange.bind(this)
+		this._onGitHubRepoUrlChange = this._onGitHubRepoUrlChange.bind(this)
 		this._loadSettingsAsync = this._loadSettingsAsync.bind(this)
 	}
 
@@ -63,19 +64,21 @@ class Component extends React.Component<{}, { settings: Settings }> {
 						<form>
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub konto token</label>
-								<input id='githubToken' type='url' className='form-control'
-									defaultValue={this._githubToken}
+								<input id='githubToken' className='form-control'
+									defaultValue={settingsStore.githubApiToken}
 									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
-									onChange={ev => this._onTokenChange(ev.currentTarget.value)} />
+									onChange={ev => this._onGitHubApiTokenChange(ev.currentTarget.value)} />
 							</div>
 
 							<div className='form-group'>
-								<label htmlFor='gistUrl'>URL til gist for settings.json</label>
+								<label htmlFor='gistUrl'>GitHub repo</label>
 								<input id='gistUrl' type='url' className='form-control'
-									defaultValue={this._settingsGistUrl}
+									defaultValue={settingsStore.githubRepoUrl}
 									placeholder='Eks: https://gist.github.com/{username}/{id}'
-									onChange={ev => this._onSettingsGistUrlChange(ev.currentTarget.value)} />
+									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
 							</div>
+
+							<button className='btn btn-default' onClick={() => this._loadSettingsAsync(true)}>Last innstillinger</button>
 						</form>
 
 						<h2>Personer</h2>
@@ -104,10 +107,12 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		)
 	}
 
-	private async _loadSettingsAsync() {
+	private async _loadSettingsAsync(force = false): Promise<void> {
 		try {
-			const settings = await this._getSettingsAsync()
+			console.info(`Loading settings (force: ${force})...`)
+			const settings = await settingsStore.getSettingsAsync(force)
 			this.setState({ settings })
+			console.info(`Loading settings (force: ${force})...OK`)
 		} catch (err) {
 			console.error('Failed to load settings.', err)
 		}
@@ -127,16 +132,15 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const createPersonRes = await faceApi.createPersonAsync(name)
 		const personId = createPersonRes.personId
 
-		const settings = await this._getSettingsAsync()
+		const settings = await settingsStore.getSettingsAsync()
 		if (settings.persons.find(p => p.personId === personId)) {
 			throw new Error('Person with same ID is already added.')
 		}
 
 		settings.persons.push({ name, jokes: [], personId, photos: [] })
 
-		await this._saveSettingsAsync(settings)
+		await settingsStore.saveSettingsAsync(settings)
 	}
-
 }
 
 export default Component
