@@ -1,14 +1,33 @@
+import {addMilliseconds} from 'date-fns'
 export const MAX_AGE_1DAY = 24 * 3600 * 1000
+
+interface Entry<T> {
+	_cacheExpires: string
+	value: T
+}
+
+class Cached<T> {
+	public readonly expires: Date
+
+	constructor(public readonly cacheKey: string, public readonly maxAgeMs: number, private readonly _factory: () => Promise<T>) {}
+	public getValueAsync(): Promise<T> {
+		return getOrSetAsync(this.cacheKey, this.maxAgeMs, this._factory)
+	}
+
+	public setValue(value: T): void {
+		set<T>(this.cacheKey, value, this.maxAgeMs)
+	}
+}
 
 function getOrPruneIfOld<T>(cacheKey: string): T | undefined {
 	const entryJson = localStorage.getItem(cacheKey)
 	if (!entryJson) { return undefined }
 
 	try {
-		const entry = JSON.parse(entryJson)
+		const entry: Entry<T> = JSON.parse(entryJson)
 		if (entry._cacheExpires && new Date(entry._cacheExpires) > new Date()) {
 			// Not expired
-			return entry
+			return entry.value
 		}
 		// Expired or no expiration info found
 		return undefined
@@ -27,12 +46,20 @@ export async function getOrSetAsync<T>(cacheKey: string, maxAgeMs: number, facto
 	}
 
 	const value: T = await factory()
-
-	// Spread does not support generic type T
-	// tslint:disable-next-line:prefer-object-spread
-	const newEntry = Object.assign({}, value, { _cacheExpires: new Date().toISOString() })
-	localStorage.setItem(cacheKey, JSON.stringify(newEntry))
+	set<T>(cacheKey, value, maxAgeMs)
 	return value
+}
+
+export function set<T>(cacheKey: string, value: T, maxAgeMs: number) {
+	const entry = createEntry(value, maxAgeMs)
+	localStorage.setItem(cacheKey, JSON.stringify(entry))
+}
+
+function createEntry<T>(value: T, maxAgeMs: number): Entry<T> {
+	return {
+		value,
+		_cacheExpires: addMilliseconds(new Date(), maxAgeMs).toISOString(),
+	}
 }
 
 export default {

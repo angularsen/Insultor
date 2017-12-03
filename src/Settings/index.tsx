@@ -113,56 +113,6 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		}
 	}
 
-	private async _saveSettingsAsync(settings: Settings): Promise<void> {
-		const token = this._githubToken
-		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
-
-		const apiUrl = this._getSettingsApiUrl()
-		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json gist URL is set.') }
-
-		const headers = new Headers()
-		headers.append('Authorization', `Bearer ${this._githubToken}`)
-		headers.append('Accept', 'application/json')
-		headers.append('Content-Type', 'application/json')
-
-		const body = JSON.stringify({
-			files: {
-				'settings.json': {
-					content: JSON.stringify(settings, null, 2),
-				},
-			},
-		}, null, 2)
-
-		const saveRes = await fetch(apiUrl, { method: 'PATCH', headers, body })
-		if (!saveRes.ok) {
-			throw new Error(`Failed to save settings: ${saveRes.status} ${saveRes.statusText} ${await saveRes.text()}`)
-		}
-	}
-
-	private async _getSettingsAsync(): Promise<Settings> {
-		const apiUrl = this._getSettingsApiUrl()
-		if (!apiUrl) { return defaultSettings }
-
-		const gistRes = await fetch(apiUrl)
-		if (!gistRes.ok) {
-			console.warn('Failed to get gist.', gistRes)
-			return defaultSettings
-		}
-
-		const gistBody = await gistRes.json()
-		const settingsRawUrl = gistBody.files['settings.json'].raw_url
-
-		const settingsRes = await fetch(settingsRawUrl)
-		const settings: Settings = await settingsRes.json()
-		if (!settings || !settings.persons) {
-			console.error('Invalid settings stored.', settings)
-			return defaultSettings
-		}
-
-		console.info('Loaded settings.', settings)
-		return settings
-	}
-
 	private async _createPersonAsync(): Promise<void> {
 		const firstName = this._addFirstName && this._addFirstName.value
 		const lastName = this._addLastName && this._addLastName.value
@@ -185,20 +135,6 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		settings.persons.push({ name, jokes: [], personId, photos: [] })
 
 		await this._saveSettingsAsync(settings)
-	}
-
-	private _getSettingsApiUrl(): string | undefined {
-		const gistUrl = this._settingsGistUrl
-		if (!gistUrl) return undefined
-
-		// From: https://gist.github.com/angularsen/08998fe7673b485de800a4c1c1780e62
-		// To:   https://api.github.com/gists/08998fe7673b485de800a4c1c1780e62
-		const matches = gistUrl.match(/gist\.github\.com\/(\w+)\/(\w+)/)
-		if (!matches) { throw new Error('Did not recognize gist URL: ' + gistUrl) }
-
-		const [, username, gistId] = matches
-		const apiUrl = `https://api.github.com/gists/${gistId}`
-		return apiUrl
 	}
 
 }
