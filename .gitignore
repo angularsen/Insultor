@@ -1,6 +1,6 @@
 node_modules
 .DS_Store
-www/bundle.js
-www/bundle.js.map
+www/*.js
+www/*.js.map
 coverage/
 stats.json

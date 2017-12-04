@@ -12,6 +12,7 @@
     "build-dev": "webpack --config webpack.dev.js",
     "build-dev-stats": "webpack --config webpack.dev.js --json > stats.json",
     "start": "node server.js",
+    "start-prod": "set NODE_ENV=production&& node server.js",
     "deploy": "npm run build && surge -p www",
     "deploy-dev": "npm run build-dev && surge -p www",
     "test": "karma start"
@@ -77,6 +78,7 @@
     "uglifyjs-webpack-plugin": "^1.1.1",
     "url-loader": "^0.6.2",
     "webpack": "^3.8.1",
+    "webpack-bundle-analyzer": "^2.9.1",
     "webpack-dev-middleware": "^1.12.1"
   },
   "resolutions": {

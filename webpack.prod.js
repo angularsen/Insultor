@@ -1,23 +1,49 @@
 const path = require('path')
 const UglifyJSPlugin = require('uglifyjs-webpack-plugin')
+var BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
 const webpack = require('webpack')
 const srcDir = path.resolve(__dirname, "src")
 
 module.exports = {
   plugins: [
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify('production') // Reduce size of things like React by removing development related warnings and assisting code
+    }),
+    new webpack.optimize.ModuleConcatenationPlugin(), // Scope hoisting to inline pieces of code only used in a single place or few places, to save size
+    new webpack.HashedModuleIdsPlugin(), // Optimize size by identifiers instead of module names
+    new webpack.optimize.CommonsChunkPlugin({ // Split node_modules code into a vendor bundle (rarely changes and is cached by browser)
+      name: 'vendor',
+      filename: 'vendor.[chunkhash].js',
+      minChunks (module) {
+        return module.context &&
+               module.context.indexOf('node_modules') >= 0;
+      }
+    }),
     new UglifyJSPlugin({
       sourceMap: false
-    })
+    })//,
+    // new BundleAnalyzerPlugin({
+    //   analyzerMode: 'server',
+    //   analyzerHost: '127.0.0.1',
+    //   analyzerPort: 8888,
+    //   reportFilename: 'reports/bundle-size.html',
+    //   defaultSizes: 'parsed',
+    //   openAnalyzer: true,
+    //   generateStatsFile: false,
+    //   statsFilename: 'stats.json',
+    //   statsOptions: null,
+    //   logLevel: 'info',
+    // })
   ],
   context: path.join(__dirname, 'src'),
-  devtool: 'source-map',
+  devtool: 'cheap-module-source-map',
   entry: [
     'babel-polyfill',
     './index.tsx',
   ],
   output: {
     path: path.join(__dirname, 'www'),
-    filename: 'bundle.js',
+    filename: '[name].[chunkhash].js',
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx']
