@@ -1,8 +1,10 @@
 const path = require('path')
 const UglifyJSPlugin = require('uglifyjs-webpack-plugin')
-var BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
+const HtmlWebpackPlugin = require('html-webpack-plugin')
 const webpack = require('webpack')
-const srcDir = path.resolve(__dirname, "src")
+const srcDir = path.join(__dirname, 'src')
+const buildPath = path.join(__dirname, 'www')
 
 module.exports = {
   plugins: [
@@ -19,6 +21,18 @@ module.exports = {
                module.context.indexOf('node_modules') >= 0;
       }
     }),
+    new HtmlWebpackPlugin({
+      template: path.join(__dirname, 'index.ejs'),
+      path: buildPath,
+      // excludeChunks: ['base'],
+      filename: 'index.html',
+      minify: {
+          collapseWhitespace: true,
+          collapseInlineTagWhitespace: true,
+          removeComments: true,
+          removeRedundantAttributes: true
+      }
+  }),
     new UglifyJSPlugin({
       sourceMap: false
     })//,
