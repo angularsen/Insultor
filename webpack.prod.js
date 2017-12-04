@@ -49,14 +49,14 @@ module.exports = {
     //   logLevel: 'info',
     // })
   ],
-  context: path.join(__dirname, 'src'),
+  context: srcDir,
   devtool: 'cheap-module-source-map',
   entry: [
     'babel-polyfill',
     './index.tsx',
   ],
   output: {
-    path: path.join(__dirname, 'www'),
+    path: buildPath,
     filename: '[name].[chunkhash].js',
   },
   resolve: {

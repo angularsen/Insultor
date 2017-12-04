@@ -79,8 +79,8 @@ class Component extends React.Component<Props, State> {
 					<button className='btn btn-default' style={{ ...visibleStyle(state, 'capturing') }}
 						onClick={() => this._stop()}>Stopp kamera</button>
 
-					<button className='btn btn-success' style={{ ...visibleStyle(state, 'captured') }}
-						onClick={() => this._usePhoto()}>Bruk bilde</button>
+					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}
+						onClick={() => this._clearPhoto()}>Tøm bilde</button>
 
 					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}
 						onClick={() => this._startAsync()}>Prøv igjen</button>
@@ -107,8 +107,11 @@ class Component extends React.Component<Props, State> {
 		this.setState({ state: 'captured' })
 	}
 
-	private _usePhoto(): any {
-		this.setState({ state: 'accepted' })
+	private _clearPhoto(): any {
+		if (!this._photoContext || !this._photoCanvas) { console.error('No canvas to clear.'); return }
+
+		this._photoContext.clearRect(0, 0, this._photoCanvas.width, this._photoCanvas.height)
+		this.setState({ state: 'notstarted' })
 	}
 
 	private async _startAsync(): Promise<void> {

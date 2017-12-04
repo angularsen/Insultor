@@ -14,6 +14,39 @@ function b64DecodeUnicode(str: string) {
 	}).join(''))
 }
 
+function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
+	return JSON.parse(b64DecodeUnicode(settingsObj.content))
+}
+
+/**
+ * settings.json fetched as object media type, to get both info about file as well as the content itself.
+ * Using Accept header: application/vnd.github.VERSION.object
+ */
+export interface GetFileResponse {
+	/** settings.json */
+	name: string,
+	/** settings.json */
+	path: string,
+	/** Blob SHA (not commit SHA) */
+	sha: string,
+	/** 1615 */
+	size: number,
+	/** https://api.github.com/repos/angularsen/Insultor-DB-Test/contents/settings.json?ref=master */
+	url: string,
+	/** https://github.com/angularsen/Insultor-DB-Test/blob/master/settings.json */
+	html_url: string,
+	/** https://api.github.com/repos/angularsen/Insultor-DB-Test/git/blobs/40823ce6b543207e696d4ae96ccfd6d04a2a475 */
+	git_url: string,
+	/** https://raw.githubusercontent.com/angularsen/Insultor-DB-Test/master/settings.json */
+	download_url: string,
+	/** 'file' or 'dir' */
+	type: 'file' | 'dir',
+	/** Content, typically base64 encoded. */
+	content: string,
+	/** Encoding of content. Typically 'base64'. */
+	encoding: string,
+}
+
 export interface Settings {
 	persons: PersonSettings[]
 }
@@ -37,7 +70,7 @@ export const defaultSettings: Settings = {
 }
 
 const localStorageKeys = {
-	settings: 'settings',
+	settingsObject: 'settingsObject',
 }
 
 const cacheAge1Hr = 3600 * 1000
@@ -51,7 +84,7 @@ const getDefaultHeaders = (token: string) => {
 }
 
 // TODO Complete this
-interface GitHubCreateFileResult {
+interface CreateFileResponse {
 	content: {
 		download_url: string,
 	},
@@ -60,58 +93,52 @@ interface GitHubCreateFileResult {
 }
 
 export class SettingsStore {
-	private readonly _settingsCache = new Cached<Settings | undefined>(localStorageKeys.settings, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
+	// private readonly _settingsResponseCache =
+	// 	new Cached<SettingsObject | undefined>(localStorageKeys.settingsResponse, cacheAge1Hr, this._fetchSettingsCommitAsync.bind(this))
+
+	private readonly _settingsCache =
+		new Cached<GetFileResponse | undefined>(localStorageKeys.settingsObject, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
 
 	constructor(public githubApiToken?: string, public githubRepoUrl?: string) { }
 
-	public async uploadImageByDataUrlAsync(imageDataUrl: string, remoteFilePath: string): Promise<GitHubCreateFileResult> {
-		const apiUrl = this._getFileApiUrl(remoteFilePath)
-		if (!apiUrl) { throw new Error('No GitHub repo URL.') }
+	public async uploadImageByDataUrlAsync(imageDataUrl: string, remoteFilePath: string): Promise<CreateFileResponse> {
 
-		const token = this.githubApiToken
-		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
+		console.info(`Upload photo to ${remoteFilePath}...`)
+		// From "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
+		// To   "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
+		const matches = imageDataUrl.match(/data:image\/(png|jpeg);base64,(.*)/)
+		if (!matches) { throw new Error('Did not recognize image data URL: ' + imageDataUrl) }
+		const [, imageType, imageDataBase64] = matches
 
-		const method = 'PUT'
-		const headers = getDefaultHeaders(token)
-		const body = {
-			message: 'Upload photo.',
-			content: b64EncodeUnicode(imageDataUrl),
-		}
-		console.info(`Upload photo to ${apiUrl}...`)
-		const res = await fetch(`${apiUrl}/`, { method, headers, body })
-		if (!res.ok) { throw new Error(`Failed to upload photo: ${apiUrl} (${res.status} ${res.statusText}`) }
+		const result = await this._saveFileAsync(remoteFilePath, imageDataBase64, 'Upload photo.', undefined, false)
 
-		console.info(`Upload photo to ${apiUrl}...OK`)
-		return res.json()
+		console.info(`Upload photo to ${remoteFilePath}...OK`)
+		return result
 	}
 
 	public async getSettingsAsync(force = false): Promise<Settings> {
-		const settings = await this._settingsCache.getValueAsync(force)
-		return settings || defaultSettings
+		// Also update commit cache to get SHA
+		const settingsObj = await this._settingsCache.getValueAsync(force)
+		if (settingsObj && settingsObj.content) {
+			if (settingsObj.encoding !== 'base64') { throw new Error('Expected base64 encoding of file.') }
+			return decodeSettingsContent(settingsObj)
+		}
+		return defaultSettings
 	}
 
-	public async saveSettingsAsync(settings: Settings): Promise<void> {
-		const token = this.githubApiToken
-		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
+	public async saveSettingsAsync(settings: Settings): Promise<Settings> {
+		// May not exist if creating settings for the first time
+		const existingSettingsObj = await this._settingsCache.getValueAsync()
 
-		const apiUrl = this._getFileApiUrl('settings.json')
-		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json GitHub repo URL is set.') }
+		const existingBlobSha = existingSettingsObj && existingSettingsObj.sha
+		const settingsJson = JSON.stringify(settings, null, 2)
+		const saveRes = await this._saveFileAsync('settings.json', settingsJson, 'Update settings.', existingBlobSha)
 
-		const headers = getDefaultHeaders(token)
-		const body = JSON.stringify({
-			files: {
-				'settings.json': {
-					content: JSON.stringify(settings, null, 2),
-				},
-			},
-		}, null, 2)
+		// Update cache
+		const updatedSettingsObj = await this._settingsCache.getValueAsync(true)
+		if (!updatedSettingsObj) { throw new Error('Failed to update settings.') }
 
-		const saveRes = await fetch(apiUrl, { method: 'PATCH', headers, body })
-		if (!saveRes.ok) {
-			throw new Error(`Failed to save settings: ${saveRes.status} ${saveRes.statusText} ${await saveRes.text()}`)
-		}
-
-		this._settingsCache.setValue(settings)
+		return decodeSettingsContent(updatedSettingsObj)
 	}
 
 	private _getFileApiUrl(remoteFilePath: string): string | undefined {
@@ -127,42 +154,66 @@ export class SettingsStore {
 		return `https://api.github.com/repos/${username}/${repo}/contents/${remoteFilePath}`
 	}
 
-	private async _fetchSettingsAsync(): Promise<Settings | undefined> {
-		const apiUrl = this._getFileApiUrl('settings.json')
-		if (!apiUrl) {
-			console.warn('No API url.')
-			return undefined
+	private async _fetchSettingsAsync(): Promise<GetFileResponse> {
+		const resBody = await this._readFileAsync('settings.json')
+		console.debug('Fetched settings object', resBody)
+		if (resBody.encoding !== 'base64') { throw new Error('Unknown encoding in settings.json: ' + resBody.encoding) }
+
+		// Content is base64 encoded JSON
+		const settings: Settings = decodeSettingsContent(resBody)
+
+		// TODO Validate more in depth
+		if (!settings || !settings.persons || settings.persons.constructor !== Array) {
+			console.error('Invalid settings stored.', settings)
+			throw new Error('Invalid settings stored.')
 		}
+
+		console.info('Loaded settings.', settings)
+		return resBody
+	}
+
+	private async _readFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
+		const apiUrl = this._getFileApiUrl(remoteFilePath)
 		const token = this.githubApiToken
-		if (!token) {
-			console.warn('No API token.')
-			return
-		}
+		if (!apiUrl) { throw new Error('No API url.') }
+		if (!token) { throw new Error('No API token.') }
 
-		console.debug('Fetching settings from: ' + apiUrl)
-
+		console.debug(`Read file: ${apiUrl}...`)
 		const headers = getDefaultHeaders(token)
 
 		const res = await fetch(apiUrl, { headers })
 		if (!res.ok) {
 			console.warn('Failed to get settings.json.', res)
-			return defaultSettings
+			throw new Error(`Failed to get settings.json: ${res.status} ${res.statusText}`)
+		}
+		console.info(`Read file: ${apiUrl}...OK.`)
+
+		const resBody: GetFileResponse = await res.json()
+		return resBody
+	}
+
+	private async _saveFileAsync(remoteFilePath: string, content: any, message: string, existingBlobSha?: string, encodeBase64 = true)
+		: Promise<CreateFileResponse> {
+		const token = this.githubApiToken
+		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
+
+		const apiUrl = this._getFileApiUrl(remoteFilePath)
+		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json GitHub repo URL is set.') }
+
+		const headers = getDefaultHeaders(token)
+		const body = JSON.stringify({
+			message,
+			sha: existingBlobSha,
+			content: encodeBase64 ? b64EncodeUnicode(content) : content,
+		})
+
+		const saveRes = await fetch(apiUrl, { method: 'PUT', headers, body })
+		if (!saveRes.ok) {
+			throw new Error(`Failed to save file ${remoteFilePath}: ${saveRes.status} ${saveRes.statusText} ${await saveRes.text()}`)
 		}
 
-		const body = await res.json()
-		if (body.encoding !== 'base64') { throw new Error('Unknown encoding in settings.json: ' + body.encoding) }
-
-		// Content is base64 encoded JSON
-		const settings: Settings = JSON.parse(b64DecodeUnicode(body.content))
-
-		// TODO Validate more in depth
-		if (!settings || !settings.persons || settings.persons.constructor !== Array) {
-			console.error('Invalid settings stored.', settings)
-			return defaultSettings
-		}
-
-		console.info('Loaded settings.', settings)
-		return settings
+		const saveResult: CreateFileResponse = await saveRes.json()
+		return saveResult
 	}
 }
 

@@ -1,17 +1,19 @@
 const webpack = require('webpack')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
 const path = require('path');
-const srcDir = path.resolve(__dirname, "src")
+const srcDir = path.join(__dirname, "src")
+const buildPath = path.join(__dirname, 'www')
 
 module.exports = {
-  context: path.join(__dirname, 'src'),
+  context: srcDir,
   devtool: 'source-map',
   entry: [
     'babel-polyfill',
     './index.tsx',
   ],
   output: {
-    path: path.join(__dirname, 'www'),
-    filename: 'bundle.js',
+    path: buildPath,
+    filename: '[name].[chunkhash].js',
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx']
@@ -46,6 +48,18 @@ module.exports = {
     ]
   },
   plugins: [
+    new HtmlWebpackPlugin({
+      template: path.join(__dirname, 'index.ejs'),
+      path: buildPath,
+      // excludeChunks: ['base'],
+      filename: 'index.html',
+      minify: {
+          collapseWhitespace: true,
+          collapseInlineTagWhitespace: true,
+          removeComments: true,
+          removeRedundantAttributes: true
+      }
+  }),
     new webpack.WatchIgnorePlugin([/css\.d\.ts$/]) // To avoid build loop for generated css.d.ts files by typings-for-css-modules-loader
   ]
 };

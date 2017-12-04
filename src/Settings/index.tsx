@@ -140,6 +140,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const createPersonRes = await faceApi.createPersonAsync(name)
 		const personId = createPersonRes.personId
 
+		// TODO Handle errors uploading image (try again, if not try to roll back face API person)
 		// TODO Increase filename index when files exist
 		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/001-300x300.jpg"
 		const remoteFilePath = `${name} (${personId})/001-${photoWidth}-${photoHeight}.jpg`
@@ -160,6 +161,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 			],
 		})
 
+		// TODO Rollback face API creation if settings.json update fails
 		await settingsStore.saveSettingsAsync(settings)
 	}
 }
