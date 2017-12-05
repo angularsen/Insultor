@@ -2,5 +2,6 @@ node_modules
 .DS_Store
 www/*.js
 www/*.js.map
+www/index.html
 coverage/
 stats.json
