@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import * as React from 'react'
 import { debounce, min } from 'underscore'
 import Selfie from '../components/Selfie'
@@ -141,9 +142,10 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const personId = createPersonRes.personId
 
 		// TODO Handle errors uploading image (try again, if not try to roll back face API person)
-		// TODO Increase filename index when files exist
-		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/001-300x300.jpg"
-		const remoteFilePath = `${name} (${personId})/001-${photoWidth}-${photoHeight}.jpg`
+		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/2017-12-05T21-46-32_300x300.jpg"
+		const remoteDirPath = `${name} (${personId})`
+		const fileName = `${format(new Date(), 'YYYY-MM-DDTHH-mm-ssZ')}_${photoWidth}-${photoHeight}.jpg`
+		const remoteFilePath = `${remoteDirPath}/${fileName}`
 		const uploadedImageFile = await settingsStore.uploadImageByDataUrlAsync(photoDataUrl, remoteFilePath)
 
 		const settings = await settingsStore.getSettingsAsync()

@@ -5,7 +5,18 @@ function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
 }
 
+// TODO Complete this
+/** GitHub API v3 - Create File */
+interface CreateFileResponse {
+	content: {
+		download_url: string,
+	},
+	commit: any,
+	message: string,
+}
+
 /**
+ * GitHub API v3 - Get File (object format)
  * settings.json fetched as object media type, to get both info about file as well as the content itself.
  * Using Accept header: application/vnd.github.VERSION.object
  */
@@ -70,37 +81,31 @@ const getDefaultHeaders = (token: string) => {
 	return headers
 }
 
-// TODO Complete this
-interface CreateFileResponse {
-	content: {
-		download_url: string,
-	},
-	commit: any,
-	message: string,
-}
-
 export class SettingsStore {
-	// private readonly _settingsResponseCache =
-	// 	new Cached<SettingsObject | undefined>(localStorageKeys.settingsResponse, cacheAge1Hr, this._fetchSettingsCommitAsync.bind(this))
-
 	private readonly _settingsCache =
 		new Cached<GetFileResponse | undefined>(localStorageKeys.settingsObject, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
 
 	constructor(public githubApiToken?: string, public githubRepoUrl?: string) { }
 
-	public async uploadImageByDataUrlAsync(imageDataUrl: string, remoteFilePath: string): Promise<CreateFileResponse> {
+	public async getFilesInFolderAsync(remoteDirPath: string): Promise<GetFileResponse[]> {
+		const apiUrl = this._getContentsApiUrl(remoteDirPath)
+		const token = this.githubApiToken
+		if (!apiUrl) { throw new Error('No API url.') }
+		if (!token) { throw new Error('No API token.') }
 
-		console.info(`Upload photo to ${remoteFilePath}...`)
-		// From "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
-		// To   "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
-		const matches = imageDataUrl.match(/data:image\/(png|jpeg);base64,(.*)/)
-		if (!matches) { throw new Error('Did not recognize image data URL: ' + imageDataUrl) }
-		const [, imageType, imageDataBase64] = matches
+		console.debug(`Read files from dir: ${apiUrl}...`)
+		const headers = getDefaultHeaders(token)
 
-		const result = await this._saveFileAsync(remoteFilePath, imageDataBase64, 'Upload photo.', undefined, false)
+		const res = await fetch(apiUrl, { headers })
+		if (!res.ok) {
+			console.warn(`Read files from dir: ${apiUrl}...ERROR.`, res)
+			throw new Error(`Failed to GET ${apiUrl}: ${res.status} ${res.statusText}`)
+		}
+		console.info(`Read files from dir: ${apiUrl}...OK.`)
 
-		console.info(`Upload photo to ${remoteFilePath}...OK`)
-		return result
+		const resBody: GetFileResponse[] = await res.json()
+		return resBody
+
 	}
 
 	public async getSettingsAsync(force = false): Promise<Settings> {
@@ -128,7 +133,22 @@ export class SettingsStore {
 		return decodeSettingsContent(updatedSettingsObj)
 	}
 
-	private _getFileApiUrl(remoteFilePath: string): string | undefined {
+	public async uploadImageByDataUrlAsync(imageDataUrl: string, remoteFilePath: string): Promise<CreateFileResponse> {
+
+		console.info(`Upload photo to ${remoteFilePath}...`)
+		// From "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
+		// To   "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
+		const matches = imageDataUrl.match(/data:image\/(png|jpeg);base64,(.*)/)
+		if (!matches) { throw new Error('Did not recognize image data URL: ' + imageDataUrl) }
+		const [, imageType, imageDataBase64] = matches
+
+		const result = await this._saveFileAsync(remoteFilePath, imageDataBase64, 'Upload photo.', undefined, false)
+
+		console.info(`Upload photo to ${remoteFilePath}...OK`)
+		return result
+	}
+
+	private _getContentsApiUrl(remotePath: string): string | undefined {
 		const repoUrl = this.githubRepoUrl
 		if (!repoUrl) return undefined
 
@@ -138,7 +158,7 @@ export class SettingsStore {
 		if (!matches) { throw new Error('Did not recognize GitHub repo URL: ' + repoUrl) }
 
 		const [, username, repo] = matches
-		return `https://api.github.com/repos/${username}/${repo}/contents/${remoteFilePath}`
+		return `https://api.github.com/repos/${username}/${repo}/contents/${remotePath}`
 	}
 
 	private async _fetchSettingsAsync(): Promise<GetFileResponse> {
@@ -160,7 +180,7 @@ export class SettingsStore {
 	}
 
 	private async _readFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
-		const apiUrl = this._getFileApiUrl(remoteFilePath)
+		const apiUrl = this._getContentsApiUrl(remoteFilePath)
 		const token = this.githubApiToken
 		if (!apiUrl) { throw new Error('No API url.') }
 		if (!token) { throw new Error('No API token.') }
@@ -184,7 +204,7 @@ export class SettingsStore {
 		const token = this.githubApiToken
 		if (!token || token.length === 0) { throw new Error('No GitHub token is configured.') }
 
-		const apiUrl = this._getFileApiUrl(remoteFilePath)
+		const apiUrl = this._getContentsApiUrl(remoteFilePath)
 		if (!apiUrl) { throw new Error('No API URL is configured. Make sure the settings.json GitHub repo URL is set.') }
 
 		const headers = getDefaultHeaders(token)
