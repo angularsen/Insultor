@@ -9,7 +9,7 @@ import CommentProvider from './services/CommentProvider'
 import { faceApiConfig } from './services/constants'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import { default as PresenceDetector } from './services/PresenceDetector'
-import { defaultSettings, Settings } from './services/Settings'
+import { defaultSettings, Settings, settingsStore } from './services/Settings'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
@@ -39,25 +39,6 @@ function getStateStyle(commentator: Commentator): StateStyle {
 		case 'deliverComments': return { background: color50, color: lightTextColor }
 		default: return { background: color10, color: lightTextColor }
 	}
-}
-
-async function getSettingsAsync(): Promise<Settings> {
-	// TODO Use URL from localStorage
-	const url = 'https://rawgit.com/angularsen/08998fe7673b485de800a4c1c1780e62/raw/08473af35b7dd7b8d32ab4ec13ed5670bea60b32/settings.json'
-	const res = await fetch(url)
-	if (!res.ok) {
-		console.warn('Failed to get settings.', res)
-		return defaultSettings
-	}
-
-	const settings: Settings = await res.json()
-	if (!settings || !settings.persons) {
-		console.error('Invalid settings stored.', settings)
-		return defaultSettings
-	}
-
-	console.info('Loaded settings.', settings)
-	return settings
 }
 
 interface State {
@@ -90,7 +71,6 @@ class Component extends React.Component<any, State> {
 		faceApiConfig.webstepPersonGroupId)
 
 	private _commentator: Commentator
-	private readonly _settingsPromise: Promise<Settings>
 
 	/**
 	 * Copying over images from live video for sending to Microsoft Face API to detect faces.
@@ -125,8 +105,6 @@ class Component extends React.Component<any, State> {
 			videoWidth: VIDEO_HEIGHT,
 		}
 
-		this._settingsPromise = getSettingsAsync()
-
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
@@ -146,7 +124,7 @@ class Component extends React.Component<any, State> {
 		})
 
 		this._commentator = new Commentator({
-			commentProvider: new CommentProvider(this._settingsPromise),
+			commentProvider: new CommentProvider(settingsStore),
 			faceApi: this._faceApi,
 			presenceDetector,
 			speech: this._speech,
@@ -272,6 +250,6 @@ class Component extends React.Component<any, State> {
 	private _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
 		this._commentator.toggleStartStop()
 	}
-}
+	}
 
 export default Component

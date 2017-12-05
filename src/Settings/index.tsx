@@ -82,6 +82,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 							</div>
 
 							<button className='btn btn-default' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
+							<button className='btn btn-default' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
 						</form>
 
 						<h2>Personer</h2>
@@ -151,7 +152,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		// TODO Handle errors uploading image (try again, if not try to roll back face API person)
 		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/2017-12-05T21-46-32_300x300.jpg"
 		const remoteDirPath = `${name} (${personId})`
-		const fileName = `${format(new Date(), 'YYYY-MM-DDTHH-mm-ssZ')}_${photoWidth}-${photoHeight}.jpg`
+		const fileName = `${format(new Date(), 'YYYY-MM-DDTHH-mm-ss')}_${photoWidth}-${photoHeight}.jpg`
 		const remoteFilePath = `${remoteDirPath}/${fileName}`
 		const uploadedImageFile = await settingsStore.uploadImageByDataUrlAsync(photoDataUrl, remoteFilePath)
 
@@ -165,8 +166,10 @@ class Component extends React.Component<{}, { settings: Settings }> {
 			],
 		})
 		await settingsStore.saveSettingsAsync(settings)
+		this.setState({ settings })
 
 		await this._addPersonFacesForPhotosWithNoFace()
+		await this._faceApi.trainPersonGroup()
 	}
 
 	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
@@ -203,6 +206,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 
 			console.debug('Update settings with new face IDs.')
 			await settingsStore.saveSettingsAsync(settings)
+			this.setState({ settings })
 
 			console.info(`Add person faces for photos with no face...OK`)
 		} catch (err) {

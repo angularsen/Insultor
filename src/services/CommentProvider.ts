@@ -1,6 +1,6 @@
 import { DetectFaceResult } from '../../docs/FaceAPI/DetectFacesResponse'
 import { Person } from '../../docs/FaceAPI/Person'
-import { Settings } from '../services/Settings'
+import { Settings, SettingsStore } from '../services/Settings'
 import JokeProvider from './JokeProvider'
 
 function getRandomInt(min: number, max: number) {
@@ -17,15 +17,12 @@ export interface ICommentProvider {
 }
 
 export class CommentProvider implements ICommentProvider {
-	private _settings?: Settings = undefined
 	private readonly _jokes = new JokeProvider()
+	private _settings?: Settings
 
-	constructor(settingsPromise: Promise<Settings>) {
-		settingsPromise
-		.then(settings => this._settings = settings)
-		.catch(err => {
-			console.error('Failed to get settings.')
-		})
+	constructor(private readonly _settingsStore: SettingsStore) {
+		this._reloadSettingsAsync()
+		_settingsStore.onSettingsChanged.subscribe(settings => this._settings = settings)
 	}
 
 	public getCommentForPerson(info: PersonInfo): string {
@@ -49,6 +46,14 @@ export class CommentProvider implements ICommentProvider {
 
 	public getCommentOnFace(face: DetectFaceResult): string {
 		return this._jokes.getJoke(face)
+	}
+
+	private async _reloadSettingsAsync() {
+		try {
+			this._settings = await this._settingsStore.getSettingsAsync()
+		} catch (err) {
+			console.error('Failed to load settings.', err)
+		}
 	}
 }
 

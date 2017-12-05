@@ -1,5 +1,6 @@
 import { Cached, getOrSetAsync, set } from './Cache'
 import { b64DecodeUnicode, b64EncodeUnicode } from 'src/services/utils';
+import { EventDispatcher, IEvent } from './utils/Events'
 
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
@@ -86,8 +87,12 @@ const getDefaultHeaders = (token: string) => {
 }
 
 export class SettingsStore {
+	public get onSettingsChanged(): IEvent<Settings> { return this.onSettingsChangedDispatcher }
+
 	private readonly _settingsCache =
 		new Cached<GetFileResponse | undefined>(localStorageKeys.settingsObject, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
+
+	private readonly onSettingsChangedDispatcher = new EventDispatcher<Settings>()
 
 	constructor(public githubApiToken?: string, public githubRepoUrl?: string) { }
 
@@ -180,6 +185,7 @@ export class SettingsStore {
 		}
 
 		console.info('Loaded settings.', settings)
+		this.onSettingsChangedDispatcher.dispatch(settings)
 		return resBody
 	}
 

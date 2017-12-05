@@ -14,6 +14,7 @@ import { FakeVideoService } from './fakes/FakeVideoService'
 import { HttpError, IMicrosoftFaceApi, ThrottledHttpError } from './MicrosoftFaceApi'
 import { DetectedFaceWithImageData, IPeriodicFaceDetector, PeriodicFaceDetector } from './PeriodicFaceDetector'
 import { IPresenceDetector } from './PresenceDetector'
+import { settingsStore } from './Settings'
 import { ISpeech, SpeakData } from './Speech'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { error } from './utils/format'
@@ -647,6 +648,7 @@ export class Commentator {
 			// 	return result
 			// })
 
+			const settings = await settingsStore.getSettingsAsync()
 			const personComments = identifiedPersons.map((idPerson, i): DeliverCommentInput => {
 				const faceId = idPerson.detectedFace.faceId
 				const imageData = input.detectedFaces.find(img => img.faceId === faceId)
@@ -657,17 +659,18 @@ export class Commentator {
 					person: idPerson.person,
 				})
 
+				const personSettings = settings.persons.find(x => x.personId === idPerson.personId)
 				const result: DeliverCommentInput = {
 					comment,
 					faceId,
 					imageDataUrl: imageData && imageData.imageDataUrl,
-					name: idPerson.person.name,
+					name: (personSettings && personSettings.name) || '(ingen navn)',
 					person: idPerson.person,
 				}
 				return result
 			})
 
-			const commentInputs = personComments //.concat(faceComments)
+			const commentInputs = personComments // .concat(faceComments)
 
 			if (commentInputs.length > 0) {
 				this._setStatus('Hør nå her', '😎')
@@ -682,11 +685,11 @@ export class Commentator {
 				const logText = `Commenting on ${commentInput.name ? `person ${commentInput.name}` : `face ${commentInput.faceId}`}`
 				console.info(`${logText}...`)
 				const speech = this._speech.speak(commentInput.comment)
-				const userData = JSON.parse(commentInput.person.userData) as UserData
+				const userData = JSON.parse(commentInput.person.userData) as {}
 
 				const commentData: DeliverCommentData = {
 					imageDataUrl: commentInput.imageDataUrl,
-					name: userData.firstName,
+					name: commentInput.name,
 					personId: commentInput.person.personId,
 					speech,
 					when: new Date(),
@@ -701,11 +704,12 @@ export class Commentator {
 			this._onSpeakCompletedDispatcher.dispatch(undefined)
 		} catch (err) {
 			if (err instanceof ThrottledHttpError) {
-				console.warn(`Identification was throttled, adding back ${input.detectedFaces.length} faces to retry later.`)
+				console.warn(`Identification was throttled, adding back ${input.detectedFaces.length} faces to retry later.`, err)
 				this._facesToIdentify.push(...input.detectedFaces)
 				this._fsm.identifyFacesFailedByThrottling()
+			} else {
+				console.error('Failed to deliver comments', err)
 			}
-			console.error('Failed to deliver comments')
 	}
 
 		this.commentsDelivered()
