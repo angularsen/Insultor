@@ -1,10 +1,10 @@
 import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 
+import { faceApiConfig } from './services/constants'
 import JokeProvider from './services/JokeProvider'
+import { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import Speech, { ISpeechOpts } from './services/Speech'
-import { MicrosoftFaceApi } from 'src/services/MicrosoftFaceApi';
-import { faceApiConfig } from 'src/services/constants';
 
 const speech = new Speech()
 

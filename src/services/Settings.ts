@@ -1,5 +1,5 @@
 import { Cached, getOrSetAsync, set } from './Cache'
-import { b64DecodeUnicode, b64EncodeUnicode } from 'src/services/utils';
+import { b64DecodeUnicode, b64EncodeUnicode } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
