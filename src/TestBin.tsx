@@ -3,6 +3,8 @@ import * as ReactDOM from 'react-dom'
 
 import JokeProvider from './services/JokeProvider'
 import Speech, { ISpeechOpts } from './services/Speech'
+import { MicrosoftFaceApi } from 'src/services/MicrosoftFaceApi';
+import { faceApiConfig } from 'src/services/constants';
 
 const speech = new Speech()
 
@@ -12,6 +14,11 @@ interface State {
 }
 
 class Component extends React.Component<{}, State> {
+	private readonly _faceApi: MicrosoftFaceApi = new MicrosoftFaceApi(
+			faceApiConfig.myPersonalSubscriptionKey,
+			faceApiConfig.endpoint,
+			faceApiConfig.webstepPersonGroupId)
+
 	constructor(props: {}) {
 		super(props)
 
@@ -35,6 +42,9 @@ class Component extends React.Component<{}, State> {
 							<button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning()}>The big chief appears in the morning</button>
 							<button style={buttonStyle} onClick={ev => this.speakNorwegian()}>Si noe norsk</button>
 							<button style={buttonStyle} onClick={ev => this.speakEnglish()}>Say something English</button>
+							<button style={buttonStyle} onClick={ev => this._trainPersonGroupAsync()}>Train person group</button>
+							<button style={buttonStyle} onClick={ev => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
+							<button style={buttonStyle} onClick={ev => this._logAllPersonsAsync()}>List persons (log)</button>
 						</div>
 						<p>
 							{this.state.textToSpeak ? this.state.textToSpeak : ''}
@@ -78,6 +88,25 @@ class Component extends React.Component<{}, State> {
 		this.speak('A sentence in English!', {lang: 'en-US', rate: 2})
 	}
 
+	private async _logAllPersonsAsync(): Promise<void> {
+		console.info('Get all persons in person group...')
+		const persons = await this._faceApi.getPersonsAsync()
+		console.info('Get all persons in person group...DONE.', persons)
+	}
+
+	private async _trainPersonGroupAsync() {
+		console.info('Training person group...')
+		await this._faceApi.trainPersonGroup()
+		console.info('Training person group...DONE. Results may still take some time.')
+		await this._updatePersonGroupTrainingStatusAsync()
+	}
+
+	private async _updatePersonGroupTrainingStatusAsync() {
+		console.info('Query person group training status...')
+		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
+		console.info('Query person group training status...DONE.', trainingStatus)
+		alert('Status trening av ansikter i persongruppe:\n' + JSON.stringify(trainingStatus))
+	}
 }
 
 export default Component

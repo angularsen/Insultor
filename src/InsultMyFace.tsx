@@ -84,7 +84,11 @@ interface StateStyle {
 }
 
 class Component extends React.Component<any, State> {
-	private _faceApi: MicrosoftFaceApi
+	private readonly _faceApi = new MicrosoftFaceApi(
+		faceApiConfig.myPersonalSubscriptionKey,
+		faceApiConfig.endpoint,
+		faceApiConfig.webstepPersonGroupId)
+
 	private _commentator: Commentator
 	private readonly _settingsPromise: Promise<Settings>
 
@@ -121,19 +125,12 @@ class Component extends React.Component<any, State> {
 			videoWidth: VIDEO_HEIGHT,
 		}
 
-		this._faceApi = new MicrosoftFaceApi(
-			faceApiConfig.myPersonalSubscriptionKey,
-			faceApiConfig.endpoint,
-			faceApiConfig.webstepPersonGroupId)
-
 		this._settingsPromise = getSettingsAsync()
 
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._onPresenceStateChanged = this._onPresenceStateChanged.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._startStopOnClick = this._startStopOnClick.bind(this)
-		this._trainPersonGroupAsync = this._trainPersonGroupAsync.bind(this)
-		this._updatePersonGroupTrainingStatusAsync = this._updatePersonGroupTrainingStatusAsync.bind(this)
 	}
 
 	public componentDidMount() {
@@ -230,10 +227,6 @@ class Component extends React.Component<any, State> {
 							{trainingStatusDiv}
 							<div>
 								<button style={buttonStyle} onClick={this._startStopOnClick}>{startStopButtonText}</button>
-								<button style={buttonStyle} onClick={() => this._speakRandom()}>Si noe</button>
-								<button style={buttonStyle} onClick={this._trainPersonGroupAsync}>Train person group</button>
-								<button style={buttonStyle} onClick={() => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
-								<button style={buttonStyle} onClick={() => this._getAllPersons()}>List persons (log)</button>
 							</div>
 							<div className='camera'>
 								<video style={{ border: '1px solid lightgrey', width: '100%' }} id='video' ref={(video) => this._video = video || undefined}
@@ -278,30 +271,6 @@ class Component extends React.Component<any, State> {
 
 	private _startStopOnClick(ev: React.MouseEvent<HTMLButtonElement>) {
 		this._commentator.toggleStartStop()
-	}
-
-	private async _getAllPersons(): Promise<void> {
-		console.info('Get all persons in person group...')
-		const persons: Person[] = await this._faceApi.getPersonsAsync()
-		console.info('Get all persons in person group...DONE.', persons)
-	}
-
-	private async _trainPersonGroupAsync(ev: React.MouseEvent<HTMLButtonElement>) {
-		console.info('Training person group...')
-		await this._faceApi.trainPersonGroup()
-		console.info('Training person group...DONE. Results may still take some time.')
-		await this._updatePersonGroupTrainingStatusAsync()
-	}
-
-	private async _updatePersonGroupTrainingStatusAsync() {
-		console.info('Query person group training status...')
-		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
-		console.info('Query person group training status...DONE.', trainingStatus)
-		this.setState({trainingStatus})
-	}
-
-	private _speakRandom() {
-		this._speech.speak('Dette er en setning for å teste norsk.')
 	}
 }
 
