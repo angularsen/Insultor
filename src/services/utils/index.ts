@@ -1,21 +1,18 @@
 import { clearTimeout, setTimeout } from 'timers'
 
-/** Debounce, copied from underscoreJS */
-// export function debounce<T>(func: (arg: T) => void, wait: number, immediate: boolean = false) {
-// 	let timeoutHandle: NodeJS.Timer | null = null
-// 	return (arg: T) => {
-// 		// tslint:disable-next-line:no-this-assignment
-// 		const context = this
-// 		const later = () => {
-// 			timeoutHandle = null
-// 			if (!immediate) func.apply(context, [arg])
-// 		}
-// 		const callNow = immediate && !timeoutHandle
-// 		clearTimeout(timeoutHandle!)
-// 		timeoutHandle = setTimeout(later, wait)
-// 		if (callNow) func.apply(context, arg)
-// 	}
-// }
+// Copied from https://stackoverflow.com/a/30106551/134761
+// Handles Unicode
+export function b64EncodeUnicode(str: string) {
+	return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+			return String.fromCharCode(parseInt(p1, 16))
+	}))
+}
+
+export function b64DecodeUnicode(str: string) {
+	return decodeURIComponent(Array.prototype.map.call(atob(str), (c: string) => {
+			return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+	}).join(''))
+}
 
 /** Utility function to create a K:V from a list of strings */
 export function strEnum<T extends string>(o: T[]): {[K in T]: K} {

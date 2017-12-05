@@ -1,18 +1,5 @@
 import { Cached, getOrSetAsync, set } from './Cache'
-
-// Copied from https://stackoverflow.com/a/30106551/134761
-// Handles Unicode
-function b64EncodeUnicode(str: string) {
-	return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-			return String.fromCharCode(parseInt(p1, 16))
-	}))
-}
-
-function b64DecodeUnicode(str: string) {
-	return decodeURIComponent(Array.prototype.map.call(atob(str), (c: string) => {
-			return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-	}).join(''))
-}
+import { b64DecodeUnicode, b64EncodeUnicode } from 'src/services/utils';
 
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
