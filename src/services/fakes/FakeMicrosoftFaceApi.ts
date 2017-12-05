@@ -9,7 +9,10 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 		private readonly _detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
 	}
 
-	public addPersonFaceAsync(personId: string, imageDataUrl: string): Promise<AddPersonFaceResponse> {
+	public addPersonFaceWithUrlAsync(personId: string, imageUrl: string): Promise<AddPersonFaceResponse> {
+		throw new Error('Method not implemented.')
+	}
+	public addPersonFaceWithImageBlobAsync(personId: string, imageDataUrl: string): Promise<AddPersonFaceResponse> {
 		throw new Error('Method not implemented.')
 	}
 	public createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse> {

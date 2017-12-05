@@ -23,7 +23,9 @@ async function ensureSuccessAsync(res: Response) {
 
 export interface IMicrosoftFaceApi {
 	/** Add face image to a person in a person group. */
-	addPersonFaceAsync(personId: string, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse>
+	addPersonFaceWithImageBlobAsync(personId: AAGUID, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse>
+	/** Add face image to a person in a person group. */
+	addPersonFaceWithUrlAsync(personId: AAGUID, imageUrl: string): Promise<AddPersonFaceResponse>
 	/** Create a person in a person group. */
 	createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse>
 	/** Create an anonymous person in a person group given one or more persisted face IDs from @see detectFacesAsync */
@@ -64,26 +66,21 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	) {
 	}
 
-	public async addPersonFaceAsync(personId: string, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse> {
-		console.log('MicrosoftFaceApi: Add person face...', personId)
+	public async addPersonFaceWithUrlAsync(personId: AAGUID, imageUrl: string): Promise<AddPersonFaceResponse> {
+		console.debug(`Adding person face personId[${personId}], imageUrl[${imageUrl}].`)
 
-		const method = 'POST'
-		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}/persistedFaces`
+		const headers = this._getDefaultHeaders('application/json')
+		const body = JSON.stringify({
+			url: imageUrl,
+		})
+		return this._addPersonFaceAsync(personId, headers, body)
+	}
+
+	public async addPersonFaceWithImageBlobAsync(personId: AAGUID, imageDataUrl: string): Promise<AddPersonFaceResponse> {
+		console.debug(`Adding person face personId[${personId}], imageDataUrl[${imageDataUrl.substring(0, 15)}...].`)
 		const headers = this._getDefaultHeaders('application/octet-stream')
-
 		const body = this._createBlob(imageDataUrl)
-
-		try {
-			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
-			await ensureSuccessAsync(res)
-			const result: AddPersonFaceResponse = await res.json()
-
-			console.log('MicrosoftFaceApi: Add person face...DONE.', personId)
-			return result
-		} catch (err) {
-			console.log('MicrosoftFaceApi: Failed to add person face.', personId, err)
-			throw err
-		}
+		return this._addPersonFaceAsync(personId, headers, body)
 	}
 
 	/** @inheritdoc */
@@ -129,7 +126,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 
 		const persistedFaceIds: string[] = []
 		for (const imageDataUrl of imageDataUrls) {
-			const personFace = await this.addPersonFaceAsync(createdPerson.personId, imageDataUrl)
+			const personFace = await this.addPersonFaceWithImageBlobAsync(createdPerson.personId, imageDataUrl)
 			persistedFaceIds.push(personFace.persistedFaceId)
 		}
 
@@ -275,6 +272,24 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			return res.json()
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
+			throw err
+		}
+	}
+
+	private async _addPersonFaceAsync(personId: AAGUID, headers: Headers, body: any) {
+		const method = 'POST'
+		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}/persistedFaces`
+		console.debug(`MicrosoftFaceApi: Add person face...`, url)
+
+		try {
+			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
+			await ensureSuccessAsync(res)
+			const result: AddPersonFaceResponse = await res.json()
+
+			console.info('MicrosoftFaceApi: Add person face...DONE.', url)
+			return result
+		} catch (err) {
+			console.error('MicrosoftFaceApi: Failed to add person face.', url, err)
 			throw err
 		}
 	}

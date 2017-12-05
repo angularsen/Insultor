@@ -5,6 +5,7 @@ import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
 import FaceApi from '../services/MicrosoftFaceApi'
 import { defaultSettings, Settings, settingsStore } from '../services/Settings'
+import { flatten } from '../services/utils'
 import PersonList from './PersonList'
 
 /** localStorage key names */
@@ -18,6 +19,8 @@ class Component extends React.Component<{}, { settings: Settings }> {
 	private _addFirstName: HTMLInputElement | null
 	private _addLastName: HTMLInputElement | null
 	private _addNickname: HTMLInputElement | null
+
+	private readonly _faceApi = new FaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId)
 
 	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
 		console.info('Saved github API token to localstorage.')
@@ -137,9 +140,13 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		}
 
 		const name = `${firstName} ${lastName}`
-		const faceApi = new FaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId)
-		const createPersonRes = await faceApi.createPersonAsync(name)
+		const createPersonRes = await this._faceApi.createPersonAsync(name)
 		const personId = createPersonRes.personId
+
+		const settings = await settingsStore.getSettingsAsync()
+		if (settings.persons.find(p => p.personId === personId)) {
+			throw new Error('Person with same ID is already added.')
+		}
 
 		// TODO Handle errors uploading image (try again, if not try to roll back face API person)
 		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/2017-12-05T21-46-32_300x300.jpg"
@@ -148,23 +155,59 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		const remoteFilePath = `${remoteDirPath}/${fileName}`
 		const uploadedImageFile = await settingsStore.uploadImageByDataUrlAsync(photoDataUrl, remoteFilePath)
 
-		const settings = await settingsStore.getSettingsAsync()
-
-		if (settings.persons.find(p => p.personId === personId)) {
-			throw new Error('Person with same ID is already added.')
-		}
-
+		// Add person to settings with URL to uploaded image
 		settings.persons.push({
 			name,
-			jokes: [],
+			jokes: ['Hei kjekken!'],
 			personId,
 			photos: [
 				{ url: uploadedImageFile.content.download_url, height: photoHeight, width: photoWidth },
 			],
 		})
-
-		// TODO Rollback face API creation if settings.json update fails
 		await settingsStore.saveSettingsAsync(settings)
+
+		await this._addPersonFacesForPhotosWithNoFace()
+	}
+
+	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
+		console.debug(`Add person faces for photos with no face...`)
+		const settings = await settingsStore.getSettingsAsync()
+
+		// Add person faces for any photos that are not already added
+		const photosWithNoFace = flatten(
+			settings.persons
+				.map(person => person.photos
+					.filter(photo => !photo.personFaceId)
+					.map(photo => ({
+						photo,
+						personId: person.personId,
+					}))))
+
+		if (photosWithNoFace.length === 0) {
+			console.debug('No photos with missing face.')
+			return
+		}
+
+		console.debug(`Adding ${photosWithNoFace.length} photos as person faces in Face API...`)
+
+		try {
+			for (const p of photosWithNoFace) {
+				try {
+					const addedFace = await this._faceApi.addPersonFaceWithUrlAsync(p.personId, p.photo.url)
+					p.photo.personFaceId = addedFace.persistedFaceId
+					console.debug(`Add new face ID [${p.photo.personFaceId}] to photo [${p.photo.url}] in settings.`)
+				} catch (err) {
+					console.warn(`Failed to add person face for personId[${p.personId}] with url[${p.photo.url}].`)
+				}
+			}
+
+			console.debug('Update settings with new face IDs.')
+			await settingsStore.saveSettingsAsync(settings)
+
+			console.info(`Add person faces for photos with no face...OK`)
+		} catch (err) {
+			console.error(`Add person faces for photos with no face...ERROR`, err)
+		}
 	}
 }
 

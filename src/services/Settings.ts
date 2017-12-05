@@ -50,6 +50,7 @@ export interface Settings {
 }
 
 export interface PersonSettings {
+	/** Microsoft Face API - person ID */
 	personId: AAGUID
 	name: string
 	jokes: string[]
@@ -60,7 +61,10 @@ export interface Photo {
 	url: string
 	width: number
 	height: number
-
+	/**
+	 * Microsoft Face API - a persisted face ID obtained by uploading this photo as a person face
+	 */
+	personFaceId?: AAGUID
 }
 
 export const defaultSettings: Settings = {
