@@ -3,6 +3,7 @@ import * as React from 'react'
 export interface Props {
 	desiredWidth: number
 	desiredHeight: number
+	onPhotoDataUrlChanged: (photoDataUrl?: string) => void
 }
 
 interface State {
@@ -70,22 +71,22 @@ class Component extends React.Component<Props, State> {
 					ref={(canvas) => this._photoCanvas = canvas || undefined}></canvas>
 
 				<div style={{display: 'flex', flexDirection: 'row' }}>
-					<button className='btn btn-primary' style={{ ...visibleStyle(state, 'capturing') }}
+					<button className='btn btn-primary' style={{ ...visibleStyle(state, 'capturing') }} type='button'
 						onClick={() => this._takePhoto()}>Ta bilde</button>
 
-					<button className='btn btn-default' style={{ ...visibleStyle(state, 'notstarted', 'accepted') }}
+					<button className='btn btn-default' style={{ ...visibleStyle(state, 'notstarted', 'accepted') }} type='button'
 						onClick={() => this._startAsync()}>Start kamera</button>
 
-					<button className='btn btn-default' style={{ ...visibleStyle(state, 'capturing') }}
+					<button className='btn btn-default' style={{ ...visibleStyle(state, 'capturing') }} type='button'
 						onClick={() => this._stop()}>Stopp kamera</button>
 
-					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}
+					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }} type='button'
 						onClick={() => this._clearPhoto()}>Tøm bilde</button>
 
-					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}
+					<button className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }} type='button'
 						onClick={() => this._startAsync()}>Prøv igjen</button>
 						{this.photoDataUrl
-							? (<a href={this.photoDataUrl || 'javascript:void(0)'} download='wow_you_look_great.jpg' role='button'
+							? (<a href={this.photoDataUrl || 'javascript:void(0)'} download='wow_you_look_great.jpg' role='button' type='button'
 									className='btn btn-default' style={{ ...visibleStyle(state, 'captured') }}>Last ned</a>)
 							: undefined
 						}
@@ -100,10 +101,12 @@ class Component extends React.Component<Props, State> {
 		if (!this._video) { console.error('No video element.'); return }
 
 		this._photoContext.drawImage(this._video, 0, 0, this.state.videoWidth, this.state.videoHeight)
-		this.photoDataUrl = this._photoCanvas.toDataURL('image/jpeg', 1.0)
+		const photoDataUrl = this._photoCanvas.toDataURL('image/jpeg', 1.0)
+		this.photoDataUrl = photoDataUrl
 		this.photoWidth = this.state.videoWidth
 		this.photoHeight = this.state.videoHeight
 		this._stopCamera()
+		this.props.onPhotoDataUrlChanged(photoDataUrl)
 		this.setState({ state: 'captured' })
 	}
 
@@ -111,6 +114,10 @@ class Component extends React.Component<Props, State> {
 		if (!this._photoContext || !this._photoCanvas) { console.error('No canvas to clear.'); return }
 
 		this._photoContext.clearRect(0, 0, this._photoCanvas.width, this._photoCanvas.height)
+		this.photoHeight = undefined
+		this.photoWidth = undefined
+		this.photoDataUrl = undefined
+		this.props.onPhotoDataUrlChanged(undefined)
 		this.setState({ state: 'notstarted' })
 	}
 

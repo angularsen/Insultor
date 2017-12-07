@@ -9,18 +9,13 @@ import { defaultSettings, Settings, settingsStore } from '../services/Settings'
 import { flatten } from '../services/utils'
 import PersonList from './PersonList'
 
-/** localStorage key names */
-const storageKeys = {
-	githubToken: 'GITHUB_GISTS_TOKEN',
-	githubRepoUrl: 'GIST_URL',
-}
-
 interface State {
 	settings: Settings
 	canAddPerson: boolean
 }
 
 class Component extends React.Component<{}, State> {
+	private _lastAutoFilledNickname: string = ''
 	private _selfie: Selfie | null
 	private _addFirstName: HTMLInputElement | null // Option<HTMLInputElement>
 	private _addLastName: HTMLInputElement | null // Option<HTMLInputElement>
@@ -30,14 +25,12 @@ class Component extends React.Component<{}, State> {
 
 	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
 		console.info('Saved github API token to localstorage.')
-		localStorage.setItem(storageKeys.githubToken, value)
 		settingsStore.githubApiToken = value
 		this._loadSettingsAsync()
 	}, 1000)
 
 	private readonly _onGitHubRepoUrlChange = debounce((value: string) => {
 		console.info('Saved GitHub repo URL to localstorage.')
-		localStorage.setItem(storageKeys.githubRepoUrl, value)
 		settingsStore.githubRepoUrl = value
 		this._loadSettingsAsync()
 	}, 1000)
@@ -50,8 +43,6 @@ class Component extends React.Component<{}, State> {
 			canAddPerson: false,
 		}
 
-		settingsStore.githubApiToken = localStorage.getItem(storageKeys.githubToken) || undefined
-		settingsStore.githubRepoUrl = localStorage.getItem(storageKeys.githubRepoUrl) || undefined
 		this._onGitHubApiTokenChange = this._onGitHubApiTokenChange.bind(this)
 		this._onGitHubRepoUrlChange = this._onGitHubRepoUrlChange.bind(this)
 		this._loadSettingsAsync = this._loadSettingsAsync.bind(this)
@@ -88,30 +79,33 @@ class Component extends React.Component<{}, State> {
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
 							</div>
 
-							<button className='btn btn-default' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
-							<button className='btn btn-default' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
+							<button className='btn btn-default' type='button' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
+							<button className='btn btn-default' type='button' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
 						</form>
 
 						<h2>Personer</h2>
 						<form>
-							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} />
+							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={photo => this._updateCanAddPerson()} />
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
 								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola'
-									onChange={ev => this._onFirstNameChange(ev.target.value)}
-									ref={(x) => { this._addFirstName = x/*Option.from(x)*/; this._updateCanAddPerson() }} />
+									onChange={ev => { this._onFirstNameChange(ev.target.value); this._updateCanAddPerson() }}
+									ref={(x) => { this._addFirstName = x/*Option.from(x)*/ }} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addLastName'>Etternavn</label>
 								<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann'
-								ref={(x) => this._addLastName = x/*Option.from(x)*/} />
+									onChange={ev => { this._updateCanAddPerson() }}
+									ref={(x) => this._addLastName = x/*Option.from(x)*/} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addNickname'>Kallenavn</label>
 								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola'
-								ref={(x) => this._addNickname = x/*Option.from(x)*/} />
+									onChange={ev => { this._updateCanAddPerson() }}
+									ref={(x) => this._addNickname = x/*Option.from(x)*/} />
 							</div>
-							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
+							<button type='submit' className='btn btn-primary'
+								onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
 						<PersonList persons={persons} deletePerson={personId => this._deletePersonAsync(personId)} />
@@ -255,9 +249,13 @@ class Component extends React.Component<{}, State> {
 	}
 
 	private _onFirstNameChange(firstName: string): any {
-		if (this._addNickname && this._addNickname.value.trim() === '') {
+		if (!this._addNickname) { console.error('No nickname field, bug?'); return }
+
+		const currentNickname = this._addNickname.value.trim()
+		if (currentNickname === '' || currentNickname === this._lastAutoFilledNickname) {
 			// Default to first name, unless user typed something else
 			this._addNickname.value = firstName
+			this._lastAutoFilledNickname = firstName
 		}
 	}
 
@@ -275,7 +273,8 @@ class Component extends React.Component<{}, State> {
 		const firstName = this._addFirstName && this._addFirstName.value
 		const lastName = this._addLastName && this._addLastName.value
 		const nickname = this._addNickname && this._addNickname.value
-		const canAddPerson = !firstName || !lastName || !nickname
+		const hasPhoto: boolean = (this._selfie && this._selfie.photoDataUrl) ? true : false
+		const canAddPerson = (firstName && lastName && nickname && hasPhoto) ? true : false
 		this.setState({ canAddPerson })
 	}
 }

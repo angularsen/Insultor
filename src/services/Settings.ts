@@ -6,6 +6,12 @@ function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
 }
 
+/** localStorage key names */
+const storageKeys = {
+	githubToken: 'GITHUB_GISTS_TOKEN',
+	githubRepoUrl: 'GIST_URL',
+}
+
 // TODO Complete this
 /** GitHub API v3 - Create File */
 interface CreateFileResponse {
@@ -94,7 +100,29 @@ export class SettingsStore {
 
 	private readonly onSettingsChangedDispatcher = new EventDispatcher<Settings>()
 
-	constructor(public githubApiToken?: string, public githubRepoUrl?: string) { }
+	constructor(githubApiToken?: string, githubRepoUrl?: string) {
+		if (githubApiToken) { this.githubApiToken = githubApiToken }
+		if (githubRepoUrl) { this.githubRepoUrl = githubRepoUrl }
+	}
+
+	public get githubRepoUrl(): string | undefined { return localStorage.getItem(storageKeys.githubRepoUrl) || undefined }
+	public set githubRepoUrl(value: string | undefined) {
+		const key = storageKeys.githubRepoUrl
+		if (value) {
+			localStorage.setItem(key, value)
+		} else {
+			localStorage.removeItem(key) }
+	}
+
+	public get githubApiToken(): string | undefined { return localStorage.getItem(storageKeys.githubToken) || undefined }
+	public set githubApiToken(value: string | undefined) {
+		const key = storageKeys.githubToken
+		if (value) {
+			localStorage.setItem(key, value)
+		} else {
+			localStorage.removeItem(key)
+		}
+	}
 
 	public async getFilesInFolderAsync(remoteDirPath: string): Promise<GetFileResponse[]> {
 		const apiUrl = this._getContentsApiUrl(remoteDirPath)
@@ -236,5 +264,4 @@ export class SettingsStore {
 
 /** Singleton instance of settings store. */
 export const settingsStore = new SettingsStore()
-
 export default SettingsStore

@@ -125,7 +125,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 			console.info(`MicrosoftFaceApi: Delete person [${personId}]...OK`)
 		} catch (err) {
 			console.error(`MicrosoftFaceApi: Delete person [${personId}]...OK`, err)
-			throw new Error(`Failed to delete person: personId[${personId}], response [${res.status} ${res.statusText}]`)
+			throw new Error(`Failed to delete person: personId[${personId}], error: [${err}]`)
 		}
 	}
 
