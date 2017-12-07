@@ -4,6 +4,7 @@ import { PersonSettings } from '../services/Settings'
 
 interface Props {
 	persons: PersonSettings[]
+	deletePerson(personId: AAGUID): void
 }
 
 function renderJoke(joke: string, jokeIdx: number) {
@@ -25,7 +26,8 @@ function renderPerson(p: PersonSettings) {
 
 			<div className='card-body' style={{ fontSize: '.7em' }}>
 				<ul style={{ listStyle: 'none', paddingLeft: 0 }}>{p.jokes.map(renderJoke)} </ul>
-				<a href='#' className='btn btn-primary'>Endre</a>
+				<button className='btn btn-primary' disabled={true}>Endre</button>
+				<button className='btn btn-danger' onClick={ev => this.props.deletePerson(p.personId)}>Slett</button>
 			</div>
 
 		</div>

@@ -114,7 +114,7 @@ class Component extends React.Component<{}, State> {
 							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
-						<PersonList persons={persons} />
+						<PersonList persons={persons} deletePerson={personId => this._deletePersonAsync(personId)} />
 
 					</div>
 				</div>
@@ -187,6 +187,29 @@ class Component extends React.Component<{}, State> {
 		await this._faceApi.trainPersonGroup()
 
 		this._clearAddPersonFields()
+	}
+
+	private async _deletePersonAsync(personId: AAGUID): Promise<void> {
+		console.debug(`Delete person [${personId}]...`)
+		try {
+			await this._faceApi.deletePersonAsync(personId)
+			const settings = await settingsStore.getSettingsAsync()
+			const personIdx = settings.persons.findIndex(p => p.personId === personId)
+			if (personIdx < 0) {
+				console.warn('Person does not exist in settings: ' + personId)
+				return
+			}
+
+			// Remove from settings
+			console.debug(`Removing person [${personId}] from settings...`)
+			settings.persons = settings.persons.filter(p => p.personId === personId)
+			await settingsStore.saveSettingsAsync(settings)
+			console.info(`Removing person [${personId}] from settings...OK.`)
+		} catch (err) {
+		console.error(`Delete person [${personId}]...ERROR.`, err)
+
+		}
+		console.info(`Delete person [${personId}]...OK.`)
 	}
 
 	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
