@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import * as React from 'react'
+// import { Option } from 'src/services/utils/TsOption'
 import { debounce, min } from 'underscore'
 import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
@@ -14,11 +15,16 @@ const storageKeys = {
 	githubRepoUrl: 'GIST_URL',
 }
 
-class Component extends React.Component<{}, { settings: Settings }> {
+interface State {
+	settings: Settings
+	canAddPerson: boolean
+}
+
+class Component extends React.Component<{}, State> {
 	private _selfie: Selfie | null
-	private _addFirstName: HTMLInputElement | null
-	private _addLastName: HTMLInputElement | null
-	private _addNickname: HTMLInputElement | null
+	private _addFirstName: HTMLInputElement | null // Option<HTMLInputElement>
+	private _addLastName: HTMLInputElement | null // Option<HTMLInputElement>
+	private _addNickname: HTMLInputElement | null // Option<HTMLInputElement>
 
 	private readonly _faceApi = new FaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId)
 
@@ -41,6 +47,7 @@ class Component extends React.Component<{}, { settings: Settings }> {
 
 		this.state = {
 			settings: defaultSettings,
+			canAddPerson: false,
 		}
 
 		settingsStore.githubApiToken = localStorage.getItem(storageKeys.githubToken) || undefined
@@ -91,17 +98,20 @@ class Component extends React.Component<{}, { settings: Settings }> {
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
 								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola'
-									onChange={ev => this._onFirstNameChange(ev.target.value)} ref={(x) => this._addFirstName = x} />
+									onChange={ev => this._onFirstNameChange(ev.target.value)}
+									ref={(x) => { this._addFirstName = x/*Option.from(x)*/; this._updateCanAddPerson() }} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addLastName'>Etternavn</label>
-								<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann' ref={(x) => this._addLastName = x} />
+								<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann'
+								ref={(x) => this._addLastName = x/*Option.from(x)*/} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addNickname'>Kallenavn</label>
-								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola' ref={(x) => this._addNickname = x} />
+								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola'
+								ref={(x) => this._addNickname = x/*Option.from(x)*/} />
 							</div>
-							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()}>➕ Opprett</button>
+							<button type='submit' className='btn btn-primary' onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
 						<PersonList persons={persons} />
@@ -124,6 +134,10 @@ class Component extends React.Component<{}, { settings: Settings }> {
 	}
 
 	private async _createPersonAsync(): Promise<void> {
+		// this._addFirstName.map(firstName => {
+		// 	return firstName
+		// })
+		// this._addLastName.flatMap(lastName => this._addNickname.map(nickname => {})))
 		const firstName = this._addFirstName && this._addFirstName.value
 		const lastName = this._addLastName && this._addLastName.value
 		const nickname = this._addNickname && this._addNickname.value
@@ -232,6 +246,14 @@ class Component extends React.Component<{}, { settings: Settings }> {
 		for (const input of inputs) {
 			if (input) { input.value = '' }
 		}
+	}
+
+	private _updateCanAddPerson() {
+		const firstName = this._addFirstName && this._addFirstName.value
+		const lastName = this._addLastName && this._addLastName.value
+		const nickname = this._addNickname && this._addNickname.value
+		const canAddPerson = !firstName || !lastName || !nickname
+		this.setState({ canAddPerson })
 	}
 }
 
