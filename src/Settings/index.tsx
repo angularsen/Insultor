@@ -90,7 +90,8 @@ class Component extends React.Component<{}, { settings: Settings }> {
 							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} />
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
-								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola' ref={(x) => this._addFirstName = x} />
+								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola'
+									onChange={ev => this._onFirstNameChange(ev.target.value)} ref={(x) => this._addFirstName = x} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addLastName'>Etternavn</label>
@@ -170,6 +171,8 @@ class Component extends React.Component<{}, { settings: Settings }> {
 
 		await this._addPersonFacesForPhotosWithNoFace()
 		await this._faceApi.trainPersonGroup()
+
+		this._clearAddPersonFields()
 	}
 
 	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
@@ -211,6 +214,23 @@ class Component extends React.Component<{}, { settings: Settings }> {
 			console.info(`Add person faces for photos with no face...OK`)
 		} catch (err) {
 			console.error(`Add person faces for photos with no face...ERROR`, err)
+		}
+	}
+
+	private _onFirstNameChange(firstName: string): any {
+		if (this._addNickname && this._addNickname.value.trim() === '') {
+			// Default to first name, unless user typed something else
+			this._addNickname.value = firstName
+		}
+	}
+
+	private _clearAddPersonFields() {
+		this._clearInputs(this._addFirstName, this._addLastName, this._addNickname)
+	}
+
+	private _clearInputs(...inputs: Array<HTMLInputElement | null>) {
+		for (const input of inputs) {
+			if (input) { input.value = '' }
 		}
 	}
 }
