@@ -4,7 +4,7 @@
   "description": "Delivers insults to your face, based on your face.",
   "main": "src/index.js",
   "scripts": {
-    "clean": "rimraf www/bundle.js*",
+    "clean": "rimraf www/*.js*",
     "compile": "webpack",
     "prebuild": "npm run clean -s",
     "build": "webpack --config webpack.prod.js",
