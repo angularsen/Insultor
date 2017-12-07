@@ -4,8 +4,8 @@ import * as React from 'react'
 import { debounce, min } from 'underscore'
 import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
-import FaceApi from '../services/MicrosoftFaceApi'
-import { defaultSettings, Settings, settingsStore } from '../services/Settings'
+import FaceApi, { HttpError } from '../services/MicrosoftFaceApi'
+import { defaultSettings, PersonSettings, Settings, settingsStore } from '../services/Settings'
 import { flatten } from '../services/utils'
 import PersonList from './PersonList'
 
@@ -108,7 +108,7 @@ class Component extends React.Component<{}, State> {
 								onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
-						<PersonList persons={persons} deletePerson={personId => this._deletePersonAsync(personId)} />
+						<PersonList persons={persons} deletePerson={personId => this._tryDeletePersonAsync(personId)} savePerson={person => this._updatePersonAsync(person)} />
 
 					</div>
 				</div>
@@ -183,10 +183,21 @@ class Component extends React.Component<{}, State> {
 		this._clearAddPersonFields()
 	}
 
-	private async _deletePersonAsync(personId: AAGUID): Promise<void> {
+	private async _tryDeletePersonAsync(personId: AAGUID): Promise<void> {
 		console.debug(`Delete person [${personId}]...`)
 		try {
-			await this._faceApi.deletePersonAsync(personId)
+			console.debug(`Removing person [${personId}] from Face API...`)
+			try {
+				await this._faceApi.deletePersonAsync(personId)
+			} catch (err) {
+				if (err instanceof HttpError && err.statusCode === 404) {
+					console.warn('Person does not exist or was already deleted from Face API.', err)
+				} else {
+					throw err
+				}
+			}
+
+			console.debug(`Removing person [${personId}] from Face API...OK.`)
 			const settings = await settingsStore.getSettingsAsync()
 			const personIdx = settings.persons.findIndex(p => p.personId === personId)
 			if (personIdx < 0) {
@@ -196,14 +207,17 @@ class Component extends React.Component<{}, State> {
 
 			// Remove from settings
 			console.debug(`Removing person [${personId}] from settings...`)
-			settings.persons = settings.persons.filter(p => p.personId === personId)
+			settings.persons = settings.persons.filter(p => p.personId !== personId)
 			await settingsStore.saveSettingsAsync(settings)
 			console.info(`Removing person [${personId}] from settings...OK.`)
-		} catch (err) {
-		console.error(`Delete person [${personId}]...ERROR.`, err)
 
+			// Update UI
+			this.setState({ settings })
+
+			console.info(`Delete person [${personId}]...OK.`)
+		} catch (err) {
+			console.error(`Delete person [${personId}]...ERROR.`, err)
 		}
-		console.info(`Delete person [${personId}]...OK.`)
 	}
 
 	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
@@ -276,6 +290,22 @@ class Component extends React.Component<{}, State> {
 		const hasPhoto: boolean = (this._selfie && this._selfie.photoDataUrl) ? true : false
 		const canAddPerson = (firstName && lastName && nickname && hasPhoto) ? true : false
 		this.setState({ canAddPerson })
+	}
+
+	private async _updatePersonAsync(person: PersonSettings) {
+		const settings = await settingsStore.getSettingsAsync()
+		const personIdx = settings.persons.findIndex(p => p.personId === person.personId)
+		if (personIdx < 0) {
+			console.error(`Could not find person in settings with id [${person.personId}].`)
+			return
+		}
+
+		// Don't save empty jokes
+		person.jokes = person.jokes.filter(j => j && j.trim() !== '')
+
+		settings.persons[personIdx] = person
+		await settingsStore.saveSettingsAsync(settings)
+		this.setState({ settings })
 	}
 }
 

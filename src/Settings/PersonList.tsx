@@ -1,49 +1,82 @@
 import * as React from 'react'
 import { min } from 'underscore'
 import { PersonSettings } from '../services/Settings'
+import PersonEditor from './PersonEditor'
 
 interface Props {
 	persons: PersonSettings[]
 	deletePerson(personId: AAGUID): void
+	savePerson(person: PersonSettings): void
+}
+
+interface State {
+	showEditorForPersonId?: AAGUID
 }
 
 function renderJoke(joke: string, jokeIdx: number) {
 	return (<li key={jokeIdx.toString()}>{joke}</li>)
 }
 
-function renderPerson(p: PersonSettings) {
-	return (
-		<div key={p.personId} className='card' style={{ width: '21rem' }}>
+class PersonList extends React.Component<Props, State> {
+	constructor(props: Props) {
+		super(props)
 
-			<div style={{ display: 'flex' }}>
-				<img className='border' style={{ width: '5em', alignSelf: 'baseline' }}
-					src={min(p.photos, photo => photo.width).url} alt='Person photo' />
-				<div className='' style={{ padding: '.5em' }}>
-					<h5 className='card-title'>{p.name}</h5>
-					<p className='text-muted'><small style={{ fontSize: '50%' }}>{p.personId}</small></p>
-				</div>
-			</div>
-
-			<div className='card-body' style={{ fontSize: '.7em' }}>
-				<ul style={{ listStyle: 'none', paddingLeft: 0 }}>{p.jokes.map(renderJoke)} </ul>
-				<button className='btn btn-primary' disabled={true}>Endre</button>
-				<button className='btn btn-danger' onClick={ev => this.props.deletePerson(p.personId)}>Slett</button>
-			</div>
-
-		</div>
-	)
-}
-
-export default function render(props: Props) {
-	if (!props.persons || props.persons.length === 0) {
-		return (<div>Ingen personer lastet..</div>)
+		this.state = {
+			showEditorForPersonId: undefined,
+		}
 	}
 
-	const persons = props.persons
+	public render() {
+		const { persons } = this.props
+		const { showEditorForPersonId } = this.state
 
-	return (
-		<div>
-			{persons.map(renderPerson)}
-		</div>
-	)
+		if (!persons || persons.length === 0) {
+			return (<div>Ingen personer lastet..</div>)
+		}
+
+		return (
+			<div>
+				{persons.map(p => this._renderPerson(p, showEditorForPersonId === p.personId))}
+			</div>
+		)
+	}
+
+	private _renderPerson(p: PersonSettings, showEditor: boolean) {
+		const { personId } = p
+
+		// Set to undefined to close the editor on Close button click
+		// const showHideEditorPersonId = showEditor ? undefined : personId
+		// const showHideEditorButtonText = showEditor ? 'Lukk' : 'Endre'
+
+		return (
+			<div key={personId} className='card' style={{ width: '21rem' }}>
+
+				<div style={{ display: 'flex' }}>
+					<img className='border' style={{ width: '5em', alignSelf: 'baseline' }}
+						src={min(p.photos, photo => photo.width).url} alt='Person photo' />
+					<div className='' style={{ padding: '.5em' }}>
+						<h5 className='card-title'>{p.name}</h5>
+						<p className='text-muted'><small style={{ fontSize: '50%' }}>{personId}</small></p>
+					</div>
+				</div>
+
+				<div className='card-body' style={{ fontSize: '.7em' }}>
+					<ul style={{ listStyle: 'none', paddingLeft: 0 }}>{p.jokes.map(renderJoke)} </ul>
+					{showEditor
+						? (<button className='btn btn-default'
+							onClick={ev => this.setState({ showEditorForPersonId: undefined })}>{'Lukk'}</button>)
+						: (<button className='btn btn-primary'
+							onClick={ev => this.setState({ showEditorForPersonId: personId })}>{'Endre'}</button>)}
+
+					<button className='btn btn-danger' onClick={ev => this.props.deletePerson(personId)}>Slett</button>
+
+					{showEditor
+						? (<PersonEditor person={p} savePerson={person => this.props.savePerson(person)} />)
+						: undefined}
+				</div>
+			</div>
+		)
+	}
+
 }
+export default PersonList

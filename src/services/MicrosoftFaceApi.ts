@@ -113,19 +113,18 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	/** @inheritdoc */
 	public async deletePersonAsync(personId: AAGUID): Promise<void> {
 		console.debug(`MicrosoftFaceApi: Delete person [${personId}]...`)
-		const method = 'POST'
+		const method = 'DELETE'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}`
 		const headers = this._getDefaultHeaders('application/json')
 
 		try {
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 			await ensureSuccessAsync(res)
-			const person: CreatePersonResponse = await res.json()
 
 			console.info(`MicrosoftFaceApi: Delete person [${personId}]...OK`)
 		} catch (err) {
 			console.error(`MicrosoftFaceApi: Delete person [${personId}]...OK`, err)
-			throw new Error(`Failed to delete person: personId[${personId}], error: [${err}]`)
+			throw err
 		}
 	}
 
