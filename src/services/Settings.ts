@@ -1,6 +1,7 @@
 import { Cached, getOrSetAsync, set } from './Cache'
 import { b64DecodeUnicode, b64EncodeUnicode } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
+import { HttpError } from './MicrosoftFaceApi';
 
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
@@ -65,6 +66,7 @@ export interface PersonSettings {
 }
 
 export interface Photo {
+	path: string
 	url: string
 	width: number
 	height: number
@@ -122,6 +124,49 @@ export class SettingsStore {
 		} else {
 			localStorage.removeItem(key)
 		}
+	}
+
+	public async deleteFileAsync(path: string): Promise<void> {
+		console.debug(`Delete file ${path}...`)
+		const token = this.githubApiToken
+		const fileApiUrl = this._getContentsApiUrl(path)
+		if (!fileApiUrl) { throw new Error('No API url.') }
+		if (!token) { throw new Error('No API token.') }
+
+		let file: GetFileResponse
+		try {
+			file = await this.getFileAsync(path)
+		} catch (err) {
+			if (err instanceof HttpError && err.response.status === 404) {
+				console.warn(`Delete file ${path}...OK. Already deleted.`)
+				return
+			}
+			throw err
+		}
+
+		const headers = getDefaultHeaders(token)
+		const body = JSON.stringify({
+			message: 'Delete file ' + path,
+			sha: file.sha,
+		})
+
+		const res = await fetch(fileApiUrl, { method: 'DELETE', headers, body })
+		if (res.status === 404) {
+			console.warn(`Delete file ${path}...OK. Already deleted.`)
+		}
+		else if (!res.ok) {
+			throw new HttpError(`Failed to delete file [${path}}: ${res.status} ${res.statusText}`, res)
+		} else {
+			console.info(`Delete file ${path}...OK.`)
+		}
+	}
+
+	public async deleteFilesAsync(paths: string[]): Promise<void> {
+		console.debug(`Delete files [${paths.join(', ')}]...`)
+		const apiUrls = paths.map(path => this._getContentsApiUrl(path))
+
+		await Promise.all(paths.map(path => this.deleteFileAsync(path)))
+		console.info(`Delete files [${paths.join(', ')}]...OK`)
 	}
 
 	public async getFilesInFolderAsync(remoteDirPath: string): Promise<GetFileResponse[]> {
@@ -199,7 +244,7 @@ export class SettingsStore {
 	}
 
 	private async _fetchSettingsAsync(): Promise<GetFileResponse> {
-		const resBody = await this._readFileAsync('settings.json')
+		const resBody = await this.getFileAsync('settings.json')
 		console.debug('Fetched settings object', resBody)
 		if (resBody.encoding !== 'base64') { throw new Error('Unknown encoding in settings.json: ' + resBody.encoding) }
 
@@ -217,21 +262,21 @@ export class SettingsStore {
 		return resBody
 	}
 
-	private async _readFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
-		const apiUrl = this._getContentsApiUrl(remoteFilePath)
+	public async getFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
+		const fileApiUrl = this._getContentsApiUrl(remoteFilePath)
 		const token = this.githubApiToken
-		if (!apiUrl) { throw new Error('No API url.') }
+		if (!fileApiUrl) { throw new Error('No API url.') }
 		if (!token) { throw new Error('No API token.') }
 
-		console.debug(`Read file: ${apiUrl}...`)
+		console.debug(`Read file: ${fileApiUrl}...`)
 		const headers = getDefaultHeaders(token)
 
-		const res = await fetch(apiUrl, { headers })
+		const res = await fetch(fileApiUrl, { headers })
 		if (!res.ok) {
-			console.warn('Failed to get settings.json.', res)
-			throw new Error(`Failed to get settings.json: ${res.status} ${res.statusText}`)
+			console.warn(`Read file: ${fileApiUrl}...FAILED.`, res)
+			throw new HttpError(`Failed to get ${fileApiUrl}: ${res.status} ${res.statusText}`, res)
 		}
-		console.info(`Read file: ${apiUrl}...OK.`)
+		console.info(`Read file: ${fileApiUrl}...OK.`)
 
 		const resBody: GetFileResponse = await res.json()
 		return resBody

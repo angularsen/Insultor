@@ -29,7 +29,7 @@ class PersonEditor extends React.Component<Props, State> {
 			<form style={{marginTop: '1em'}}>
 				{this._renderJokeEditors(person.jokes)}
 				<div className='form-group' style={{marginTop: '1em'}}>
-					<button type='submit' role='button' className='btn btn-primary' onClick={ev => { this.props.savePerson(person) }}>Lagre</button>
+					<button type='button' role='button' className='btn btn-primary' onClick={ev => { this.props.savePerson(person) }}>Lagre</button>
 					<button type='button' role='button' className='btn btn-default' onClick={ev => this._addJoke()}>Legg til</button>
 				</div>
 			</form>

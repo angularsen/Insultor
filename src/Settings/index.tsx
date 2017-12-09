@@ -104,7 +104,7 @@ class Component extends React.Component<{}, State> {
 									onChange={ev => { this._updateCanAddPerson() }}
 									ref={(x) => this._addNickname = x/*Option.from(x)*/} />
 							</div>
-							<button type='submit' className='btn btn-primary'
+							<button type='button' className='btn btn-primary'
 								onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
@@ -171,7 +171,11 @@ class Component extends React.Component<{}, State> {
 			jokes: ['Hei kjekken!'],
 			personId,
 			photos: [
-				{ url: uploadedImageFile.content.download_url, height: photoHeight, width: photoWidth },
+				{
+					path: remoteFilePath,
+					url: uploadedImageFile.content.download_url,
+					height: photoHeight,
+					width: photoWidth },
 			],
 		})
 		await settingsStore.saveSettingsAsync(settings)
@@ -196,14 +200,18 @@ class Component extends React.Component<{}, State> {
 					throw err
 				}
 			}
-
 			console.debug(`Removing person [${personId}] from Face API...OK.`)
+
 			const settings = await settingsStore.getSettingsAsync()
 			const personIdx = settings.persons.findIndex(p => p.personId === personId)
 			if (personIdx < 0) {
 				console.warn('Person does not exist in settings: ' + personId)
 				return
 			}
+
+			const person = settings.persons[personIdx]
+			const filePaths = person.photos.map(x => x.path)
+			await settingsStore.deleteFilesAsync(filePaths)
 
 			// Remove from settings
 			console.debug(`Removing person [${personId}] from settings...`)
