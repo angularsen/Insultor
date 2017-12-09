@@ -9,7 +9,7 @@ import CommentProvider from './services/CommentProvider'
 import { faceApiConfig } from './services/constants'
 import FaceApi, { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import { default as PresenceDetector } from './services/PresenceDetector'
-import { defaultSettings, Settings, settingsStore } from './services/Settings'
+import { Settings, settingsStore } from './services/Settings'
 import Speech from './services/Speech'
 import { isDefined } from './services/utils/index'
 import { VideoService } from './services/VideoService'
@@ -99,7 +99,7 @@ class Component extends React.Component<any, State> {
 			isFaceApiActive: false,
 			isPresenceDetected: false,
 			motionScore: 0,
-			settings: defaultSettings,
+			settings: settingsStore.currentSettingsOrDefault,
 			trainingStatus: undefined,
 			videoHeight: VIDEO_WIDTH,
 			videoWidth: VIDEO_HEIGHT,

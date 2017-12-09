@@ -5,7 +5,7 @@ import { debounce, min } from 'underscore'
 import Selfie from '../components/Selfie'
 import { faceApiConfig } from '../services/constants'
 import FaceApi, { HttpError } from '../services/MicrosoftFaceApi'
-import { defaultSettings, PersonSettings, Settings, settingsStore } from '../services/Settings'
+import { getDefaultSettings, PersonSettings, Settings, settingsStore } from '../services/Settings'
 import { flatten } from '../services/utils'
 import PersonList from './PersonList'
 
@@ -39,7 +39,7 @@ class Component extends React.Component<{}, State> {
 		super(props)
 
 		this.state = {
-			settings: defaultSettings,
+			settings: settingsStore.currentSettingsOrDefault,
 			canAddPerson: false,
 		}
 

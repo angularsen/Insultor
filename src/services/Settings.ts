@@ -76,8 +76,10 @@ export interface Photo {
 	personFaceId?: AAGUID
 }
 
-export const defaultSettings: Settings = {
-	persons: [],
+export function getDefaultSettings(): Settings {
+	return {
+		persons: [],
+	}
 }
 
 const localStorageKeys = {
@@ -97,6 +99,15 @@ const getDefaultHeaders = (token: string) => {
 export class SettingsStore {
 	public get onSettingsChanged(): IEvent<Settings> { return this.onSettingsChangedDispatcher }
 
+	/**
+	 * Last loaded settings or default settings if not yet loaded or no settings stored.
+	 * Use this to synchronously read the settings instead of the async getSettings() function.
+	*/
+	public get currentSettingsOrDefault(): Settings {
+		return this._currentSettings || getDefaultSettings()
+	}
+
+	private _currentSettings?: Settings
 	private readonly _settingsCache =
 		new Cached<GetFileResponse | undefined>(localStorageKeys.settingsObject, cacheAge1Hr, this._fetchSettingsAsync.bind(this))
 
@@ -124,6 +135,24 @@ export class SettingsStore {
 		} else {
 			localStorage.removeItem(key)
 		}
+	}
+
+	public async deletePersonAsync(personId: AAGUID) {
+		console.debug(`Delete person ${personId}...`)
+
+		const settings = await this.getSettingsAsync()
+		const person = settings.persons.find(p => p.personId === personId)
+		if (!person) {
+			console.warn(`Person already deleted. Id: ${personId}`)
+			return
+		}
+
+		console.debug('Delete person files...')
+		await this.deleteFilesAsync(person.photos.map(photo => photo.path))
+		console.info('Delete person files...OK.')
+
+		settings.persons = settings.persons.filter(p => p.personId !== personId)
+		this.saveSettingsAsync(settings)
 	}
 
 	public async deleteFileAsync(path: string): Promise<void> {
@@ -195,9 +224,12 @@ export class SettingsStore {
 		const settingsObj = await this._settingsCache.getValueAsync(force)
 		if (settingsObj && settingsObj.content) {
 			if (settingsObj.encoding !== 'base64') { throw new Error('Expected base64 encoding of file.') }
-			return decodeSettingsContent(settingsObj)
+
+			const settings =  decodeSettingsContent(settingsObj)
+			this._currentSettings = settings
+			return settings
 		}
-		return defaultSettings
+		return getDefaultSettings()
 	}
 
 	public async saveSettingsAsync(settings: Settings): Promise<Settings> {

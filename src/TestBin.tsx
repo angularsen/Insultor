@@ -5,7 +5,7 @@ import { faceApiConfig } from './services/constants'
 import JokeProvider from './services/JokeProvider'
 import { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import Speech, { ISpeechOpts } from './services/Speech'
-import { settingsStore } from 'src/services/Settings';
+import { settingsStore } from './services/Settings';
 
 const speech = new Speech()
 
