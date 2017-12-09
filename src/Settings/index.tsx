@@ -26,13 +26,13 @@ class Component extends React.Component<{}, State> {
 	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
 		console.info('Saved github API token to localstorage.')
 		settingsStore.githubApiToken = value
-		this._loadSettingsAsync()
+		this._loadSettingsAsync(true)
 	}, 1000)
 
 	private readonly _onGitHubRepoUrlChange = debounce((value: string) => {
 		console.info('Saved GitHub repo URL to localstorage.')
 		settingsStore.githubRepoUrl = value
-		this._loadSettingsAsync()
+		this._loadSettingsAsync(true)
 	}, 1000)
 
 	constructor(props: {}) {
