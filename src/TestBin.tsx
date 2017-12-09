@@ -5,6 +5,7 @@ import { faceApiConfig } from './services/constants'
 import JokeProvider from './services/JokeProvider'
 import { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import Speech, { ISpeechOpts } from './services/Speech'
+import { settingsStore } from 'src/services/Settings';
 
 const speech = new Speech()
 
@@ -45,6 +46,7 @@ class Component extends React.Component<{}, State> {
 							<button style={buttonStyle} onClick={ev => this._trainPersonGroupAsync()}>Train person group</button>
 							<button style={buttonStyle} onClick={ev => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
 							<button style={buttonStyle} onClick={ev => this._logAllPersonsAsync()}>List persons (log)</button>
+							<button style={buttonStyle} onClick={ev => this._deleteIncompletePersons()}>Slett ukomplette personer</button>
 						</div>
 						<p>
 							{this.state.textToSpeak ? this.state.textToSpeak : ''}
@@ -89,23 +91,59 @@ class Component extends React.Component<{}, State> {
 	}
 
 	private async _logAllPersonsAsync(): Promise<void> {
-		console.info('Get all persons in person group...')
+		console.debug('Get all persons in person group...')
 		const persons = await this._faceApi.getPersonsAsync()
 		console.info('Get all persons in person group...DONE.', persons)
 	}
 
 	private async _trainPersonGroupAsync() {
-		console.info('Training person group...')
+		console.debug('Training person group...')
 		await this._faceApi.trainPersonGroup()
 		console.info('Training person group...DONE. Results may still take some time.')
 		await this._updatePersonGroupTrainingStatusAsync()
 	}
 
 	private async _updatePersonGroupTrainingStatusAsync() {
-		console.info('Query person group training status...')
+		console.debug('Query person group training status...')
 		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
 		console.info('Query person group training status...DONE.', trainingStatus)
 		alert('Status trening av ansikter i persongruppe:\n' + JSON.stringify(trainingStatus))
+	}
+
+	private async _deleteIncompletePersons() {
+		console.debug('Delete incomplete persons...')
+		const faceApiPersons = await this._faceApi.getPersonsAsync()
+		const settings = await settingsStore.getSettingsAsync()
+
+		const faceApiPersonsWithoutSettings = faceApiPersons.filter(fp => settings.persons.findIndex(sp => sp.personId === fp.personId) < 0)
+		const settingsPersonsWithoutFaceApi = settings.persons.filter(sp => faceApiPersons.findIndex(fp => sp.personId === fp.personId) < 0)
+
+		if (faceApiPersonsWithoutSettings.length === 0 && settingsPersonsWithoutFaceApi.length === 0) {
+			console.info('No incomplete persons found in settings or in Face API.')
+			return
+		}
+
+		if (faceApiPersonsWithoutSettings.length > 0) {
+			try {
+			console.debug(`Delete ${faceApiPersonsWithoutSettings.length} persons from Face API without settings entry...`)
+			await Promise.all(faceApiPersonsWithoutSettings.map(p => this._faceApi.deletePersonAsync(p.personId)))
+			console.info(`Delete ${faceApiPersonsWithoutSettings.length} persons from Face API without settings entry...OK.`)
+			} catch (err) {
+				console.error(`Failed to delete one or more Face API persons.`, err)
+			}
+		}
+
+		if (settingsPersonsWithoutFaceApi.length > 0) {
+			try {
+				console.debug(`Delete ${settingsPersonsWithoutFaceApi.length} persons from settings without Face API entry...`)
+				await Promise.all(settingsPersonsWithoutFaceApi.map(p => settingsStore.deletePersonAsync(p.personId)))
+				console.info(`Delete ${settingsPersonsWithoutFaceApi.length} persons from settings without Face API entry...OK.`)
+			} catch (err) {
+				console.error(`Failed to delete one or more persons from settings.`, err)
+			}
+		}
+
+		console.info('Delete incomplete persons...OK.')
 	}
 }
 
