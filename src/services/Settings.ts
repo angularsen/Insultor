@@ -1,7 +1,7 @@
-import { Cached, getOrSetAsync, set } from './Cache'
+import { Cached } from './Cache'
+import { HttpError } from './MicrosoftFaceApi'
 import { b64DecodeUnicode, b64EncodeUnicode } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
-import { HttpError } from './MicrosoftFaceApi';
 
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
@@ -102,7 +102,7 @@ export class SettingsStore {
 	/**
 	 * Last loaded settings or default settings if not yet loaded or no settings stored.
 	 * Use this to synchronously read the settings instead of the async getSettings() function.
-	*/
+	 */
 	public get currentSettingsOrDefault(): Settings {
 		return this._currentSettings || getDefaultSettings()
 	}
@@ -182,8 +182,7 @@ export class SettingsStore {
 		const res = await fetch(fileApiUrl, { method: 'DELETE', headers, body })
 		if (res.status === 404) {
 			console.warn(`Delete file ${path}...OK. Already deleted.`)
-		}
-		else if (!res.ok) {
+		} else if (!res.ok) {
 			throw new HttpError(`Failed to delete file [${path}}: ${res.status} ${res.statusText}`, res)
 		} else {
 			console.info(`Delete file ${path}...OK.`)
@@ -192,7 +191,6 @@ export class SettingsStore {
 
 	public async deleteFilesAsync(paths: string[]): Promise<void> {
 		console.debug(`Delete files [${paths.join(', ')}]...`)
-		const apiUrls = paths.map(path => this._getContentsApiUrl(path))
 
 		await Promise.all(paths.map(path => this.deleteFileAsync(path)))
 		console.info(`Delete files [${paths.join(', ')}]...OK`)
@@ -239,6 +237,7 @@ export class SettingsStore {
 		const existingBlobSha = existingSettingsObj && existingSettingsObj.sha
 		const settingsJson = JSON.stringify(settings, null, 2)
 		const saveRes = await this._saveFileAsync('settings.json', settingsJson, 'Update settings.', existingBlobSha)
+		console.debug('Saved settings.', saveRes)
 
 		// Update cache
 		const updatedSettingsObj = await this._settingsCache.getValueAsync(true)
@@ -254,12 +253,32 @@ export class SettingsStore {
 		// To   "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNby..."
 		const matches = imageDataUrl.match(/data:image\/(png|jpeg);base64,(.*)/)
 		if (!matches) { throw new Error('Did not recognize image data URL: ' + imageDataUrl) }
-		const [, imageType, imageDataBase64] = matches
+		const [/*entire match*/, /*imageType*/, imageDataBase64] = matches
 
 		const result = await this._saveFileAsync(remoteFilePath, imageDataBase64, 'Upload photo.', undefined, false)
 
 		console.info(`Upload photo to ${remoteFilePath}...OK`)
 		return result
+	}
+
+	public async getFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
+		const fileApiUrl = this._getContentsApiUrl(remoteFilePath)
+		const token = this.githubApiToken
+		if (!fileApiUrl) { throw new Error('No API url.') }
+		if (!token) { throw new Error('No API token.') }
+
+		console.debug(`Read file: ${fileApiUrl}...`)
+		const headers = getDefaultHeaders(token)
+
+		const res = await fetch(fileApiUrl, { headers })
+		if (!res.ok) {
+			console.warn(`Read file: ${fileApiUrl}...FAILED.`, res)
+			throw new HttpError(`Failed to get ${fileApiUrl}: ${res.status} ${res.statusText}`, res)
+		}
+		console.info(`Read file: ${fileApiUrl}...OK.`)
+
+		const resBody: GetFileResponse = await res.json()
+		return resBody
 	}
 
 	private _getContentsApiUrl(remotePath: string): string | undefined {
@@ -294,26 +313,6 @@ export class SettingsStore {
 		return resBody
 	}
 
-	public async getFileAsync(remoteFilePath: string): Promise<GetFileResponse> {
-		const fileApiUrl = this._getContentsApiUrl(remoteFilePath)
-		const token = this.githubApiToken
-		if (!fileApiUrl) { throw new Error('No API url.') }
-		if (!token) { throw new Error('No API token.') }
-
-		console.debug(`Read file: ${fileApiUrl}...`)
-		const headers = getDefaultHeaders(token)
-
-		const res = await fetch(fileApiUrl, { headers })
-		if (!res.ok) {
-			console.warn(`Read file: ${fileApiUrl}...FAILED.`, res)
-			throw new HttpError(`Failed to get ${fileApiUrl}: ${res.status} ${res.statusText}`, res)
-		}
-		console.info(`Read file: ${fileApiUrl}...OK.`)
-
-		const resBody: GetFileResponse = await res.json()
-		return resBody
-	}
-
 	private async _saveFileAsync(remoteFilePath: string, content: any, message: string, existingBlobSha?: string, encodeBase64 = true)
 		: Promise<CreateFileResponse> {
 		const token = this.githubApiToken
@@ -339,6 +338,6 @@ export class SettingsStore {
 	}
 }
 
-/** Singleton instance of settings store. */
-export const settingsStore = new SettingsStore()
+// /** Singleton instance of settings store. */
+// export const settingsStore = new SettingsStore()
 export default SettingsStore

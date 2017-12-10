@@ -1,15 +1,10 @@
-import { isDefined } from './utils/index'
+import { checkDefined } from './utils/index'
 
 /**
  * Handles configuring video source to stream to a <video> HTML element
  * and has actions for starting/stopping video stream.
  */
 export interface IVideoService {
-	/**
-	 * Draw current video image to a canvas.
-	 */
-	drawCurrentImageOnCanvas(canvas: HTMLCanvasElement, width: number, height: number): void
-
 	/**
 	 * Gets an URL encoded string of the current image data.
 	 */
@@ -27,8 +22,8 @@ export interface IVideoService {
 }
 
 export class VideoService implements IVideoService {
-	private isPlaying: boolean
-	private videoStream: MediaStream
+	private isRunning: boolean
+	private videoStream?: MediaStream
 
 	constructor(
 		private readonly _video: HTMLVideoElement,
@@ -36,20 +31,8 @@ export class VideoService implements IVideoService {
 		private readonly _width: number = 500,
 		private readonly _height: number = 500,
 		) {
-		isDefined(_video, '_video')
-		isDefined(_copyImageCanvas, '_copyImageCanvas')
-	}
-
-	public drawCurrentImageOnCanvas(canvas: HTMLCanvasElement): void {
-		const context = canvas.getContext('2d')
-		if (!context) { throw new Error('Unable to get context of canvas.') }
-
-		// Draw current content of <video> element to canvas
-		context.drawImage(this._video, 0, 0, this._video.width, this._video.height)
-
-		const imageDataUrl = canvas.toDataURL('image/png')
-
-		throw new Error('Method not implemented.')
+		checkDefined(_video, '_video')
+		checkDefined(_copyImageCanvas, '_copyImageCanvas')
 	}
 
 	public getCurrentImageDataUrl() {
@@ -62,6 +45,11 @@ export class VideoService implements IVideoService {
 	}
 
 	public start(): void {
+		if (this.isRunning) {
+			console.warn('Already started.')
+			return
+		}
+
 		console.info('start(): Starting video...')
 		navigator.mediaDevices.getUserMedia({
 			audio: false,
@@ -81,7 +69,7 @@ export class VideoService implements IVideoService {
 				this._video.play()
 			}
 
-			this.isPlaying = true
+			this.isRunning = true
 			console.log('Starting video...OK.')
 		})
 		.catch((err) => {
@@ -93,6 +81,14 @@ export class VideoService implements IVideoService {
 	public stop(): void {
 		try {
 			console.log('Stopping video...')
+			if (!this.videoStream) {
+				console.warn('Nothing to stop, video stream not created yet.')
+				return
+			}
+			if (!this.isRunning) {
+				console.warn('Already stopped.')
+				return
+			}
 
 			const videoTracks = this.videoStream.getVideoTracks()
 			const audioTracks = this.videoStream.getAudioTracks()
@@ -102,7 +98,7 @@ export class VideoService implements IVideoService {
 
 			this._video.pause()
 			this._video.src = ''
-			this.isPlaying = false
+			this.isRunning = false
 
 			console.log('Stopping video...OK.')
 		} catch (err) {

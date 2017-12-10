@@ -1,4 +1,3 @@
-import { DetectFaceResult, DetectFacesResponse } from '../../../docs/FaceAPI/DetectFacesResponse'
 import { DetectedFaceWithImageData, IPeriodicFaceDetector } from '../PeriodicFaceDetector'
 import { EventDispatcher, IEvent } from '../utils/Events'
 

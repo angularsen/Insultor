@@ -1,8 +1,8 @@
 import { differenceInMilliseconds } from 'date-fns'
 // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
-import { clearTimeout, setInterval, setTimeout } from 'timers'
-import { DetectFaceResult, DetectFacesResponse } from '../../docs/FaceAPI/DetectFacesResponse'
-import {isDefined } from './utils'
+import { clearTimeout, setTimeout } from 'timers'
+import { DetectFaceResult } from '../../docs/FaceAPI/DetectFacesResponse'
+import {checkDefined } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 import { error } from './utils/format'
 
@@ -29,14 +29,14 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 
 	private _isRunning: boolean
 	private _faceDetected = new EventDispatcher<DetectedFaceWithImageData[]>()
-	private _timeoutHandle?: NodeJS.Timer
+	private _timer?: NodeJS.Timer
 
 	constructor(
 		private _intervalMs: number,
 		private _detectFacesAsync: () => Promise<DetectedFaceWithImageData[]>,
 	) {
-		isDefined(_intervalMs, '_intervalMs')
-		isDefined(_detectFacesAsync, '_detectFacesAsync')
+		checkDefined(_intervalMs, '_intervalMs')
+		checkDefined(_detectFacesAsync, '_detectFacesAsync')
 
 		if (_intervalMs < 0) {
 			throw new Error('Interval must be a positive number, was: ' + _intervalMs)
@@ -60,9 +60,9 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		this._isRunning = false
 
 		console.info(`PeriodicFaceDetector: Stopping.`)
-		if (this._timeoutHandle) {
-			clearTimeout(this._timeoutHandle)
-			this._timeoutHandle = undefined
+		if (this._timer) {
+			clearTimeout(this._timer)
+			this._timer = undefined
 		}
 	}
 
@@ -102,6 +102,6 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 			console.debug(`PeriodicFaceDetector: Queue next detect faces in ${timeToWaitMs} ms.`)
 		}
 
-		return setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
+		this._timer = setTimeout(() => this._onDetectFacesAsync(intervalMs), timeToWaitMs)
 	}
 }

@@ -2,7 +2,9 @@ import { IPresenceDetector } from '../PresenceDetector'
 import { EventDispatcher, IEvent } from '../utils/Events'
 
 export class FakePresenceDetector implements IPresenceDetector {
+	public get onMotionScore(): IEvent<number> { return this._onMotionScore }
 	private _isDetected: boolean = false
+	private _onMotionScore = new EventDispatcher<number>()
 	private _onIsDetectedChanged = new EventDispatcher<boolean>()
 
 	public get onIsDetectedChanged(): IEvent<boolean> { return this._onIsDetectedChanged }
@@ -15,6 +17,7 @@ export class FakePresenceDetector implements IPresenceDetector {
 	}
 	public addMotionScore(motionScore: number, receivedOnDate: Date): void {
 		console.log('FakePresenceDetector: Added motion score ' + motionScore)
+		this._onMotionScore.dispatch(motionScore)
 	}
 	public get isDetected() {
 		return this._isDetected

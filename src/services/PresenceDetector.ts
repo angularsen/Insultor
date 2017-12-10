@@ -1,11 +1,8 @@
 import { differenceInMilliseconds } from 'date-fns'
 // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
-import { clearInterval, setInterval, setTimeout } from 'timers'
+import { clearInterval, setInterval } from 'timers'
 import { EventDispatcher, IEvent } from './utils/Events'
-import { isDefined, strEnum } from './utils/index'
-import { IVideoService } from './VideoService'
-
-const motionThreshold = 50	// Motion detected if frame.score value is greater than this
+import { checkDefined } from './utils/index'
 
 /**
  * During transition from not detected to detected, if any two motion detected samples are at least this
@@ -69,7 +66,8 @@ export interface PresenceDetectorOpts  {
 export interface IPresenceDetector {
 	isDetected: boolean
 	readonly onIsDetectedChanged: IEvent<boolean>
-	start(pollIntervalMs?: number): void
+	readonly onMotionScore: IEvent<number>
+	start(pollIntervalMs ?: number): void
 	stop(): void
 }
 
@@ -106,8 +104,8 @@ export class PresenceDetector implements IPresenceDetector {
 		this._opts = { ...{}, ...opts, ...defaultOpts }
 		this.isDetected = false
 
-		this._diffCalcContext = isDefined(this._opts.diffCalcCanvas.getContext('2d'), 'diffCalcContext')!
-		this._diffResultContext = isDefined(this._opts.diffResultCanvas.getContext('2d'), 'diffResultContext')!
+		this._diffCalcContext = checkDefined(this._opts.diffCalcCanvas.getContext('2d'), 'diffCalcContext')!
+		this._diffResultContext = checkDefined(this._opts.diffResultCanvas.getContext('2d'), 'diffResultContext')!
 		this._diffImageSize = { width: this._opts.diffWidth || 64, height: this._opts.diffHeight || 64 }
 
 		this._updateMotionScoreFromImage = this._updateMotionScoreFromImage.bind(this)

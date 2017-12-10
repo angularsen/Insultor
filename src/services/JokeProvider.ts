@@ -1,4 +1,4 @@
-import { DetectFaceResult, Emotion, GlassType } from '../../docs/FaceAPI/DetectFacesResponse'
+import { DetectFaceResult, Emotion } from '../../docs/FaceAPI/DetectFacesResponse'
 import { jokes } from './jokes'
 
 function getRandom(items: any[]) {
@@ -15,8 +15,8 @@ export class JokeProvider {
 		if (faceAnalysis === undefined) return 'No joke for you!'
 
 		const { faceAttributes } = faceAnalysis
-		const { age, emotion, facialHair, gender, glasses, hair, smile } = faceAttributes
-		const { bald, invisible, hairColor } = hair
+		const { /*age, gender, smile, */ emotion, facialHair, glasses, hair } = faceAttributes
+		const { /*bald, invisible,*/ hairColor } = hair
 
 		const moustacheJoke = (facialHair && facialHair.moustache && facialHair.moustache >= 0.5)
 			? jokes.moustache(facialHair.moustache) : []

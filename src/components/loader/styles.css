@@ -17,7 +17,7 @@
   animation-delay: -0.16s;
   position: absolute;
   top: 3em;
-  right: 3em;
+  left: 3em;
 }
 .loader:before,
 .loader:after {

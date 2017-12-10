@@ -1,11 +1,10 @@
 import * as React from 'react'
-import * as ReactDOM from 'react-dom'
 
 import { faceApiConfig } from './services/constants'
+import { DataStore } from './services/DataStore'
 import JokeProvider from './services/JokeProvider'
 import { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
 import Speech, { ISpeechOpts } from './services/Speech'
-import { settingsStore } from './services/Settings';
 
 const speech = new Speech()
 
@@ -14,13 +13,17 @@ interface State {
 	textToSpeak?: string
 }
 
-class Component extends React.Component<{}, State> {
+interface Props {
+	dataStore: DataStore
+}
+
+class Component extends React.Component<Props, State> {
 	private readonly _faceApi: MicrosoftFaceApi = new MicrosoftFaceApi(
 			faceApiConfig.myPersonalSubscriptionKey,
 			faceApiConfig.endpoint,
 			faceApiConfig.webstepPersonGroupId)
 
-	constructor(props: {}) {
+	constructor(props: Props) {
 		super(props)
 
 		this.state = {
@@ -38,15 +41,15 @@ class Component extends React.Component<{}, State> {
 					<div className='col'>
 						<h1 className='display-4'>TestBin</h1>
 						<div>
-							<button style={buttonStyle} onClick={ev => this.speakRandomJoke()}>Insult me now!</button>
-							<button style={buttonStyle} onClick={ev => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>
-							<button style={buttonStyle} onClick={ev => this.onBigChiefAppearAnItIsdMorning()}>The big chief appears in the morning</button>
-							<button style={buttonStyle} onClick={ev => this.speakNorwegian()}>Si noe norsk</button>
-							<button style={buttonStyle} onClick={ev => this.speakEnglish()}>Say something English</button>
-							<button style={buttonStyle} onClick={ev => this._trainPersonGroupAsync()}>Train person group</button>
-							<button style={buttonStyle} onClick={ev => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
-							<button style={buttonStyle} onClick={ev => this._logAllPersonsAsync()}>List persons (log)</button>
-							<button style={buttonStyle} onClick={ev => this._deleteIncompletePersons()}>Slett ukomplette personer</button>
+							<button style={buttonStyle} onClick={_ => this.speakRandomJoke()}>Insult me now!</button>
+							<button style={buttonStyle} onClick={_ => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>
+							<button style={buttonStyle} onClick={_ => this.onBigChiefAppearAnItIsdMorning()}>The big chief appears in the morning</button>
+							<button style={buttonStyle} onClick={_ => this.speakNorwegian()}>Si noe norsk</button>
+							<button style={buttonStyle} onClick={_ => this.speakEnglish()}>Say something English</button>
+							<button style={buttonStyle} onClick={_ => this._trainPersonGroupAsync()}>Train person group</button>
+							<button style={buttonStyle} onClick={_ => this._updatePersonGroupTrainingStatusAsync()}>Update training status</button>
+							<button style={buttonStyle} onClick={_ => this._logAllPersonsAsync()}>List persons (log)</button>
+							<button style={buttonStyle} onClick={_ => this._deleteIncompletePersons()}>Slett ukomplette personer</button>
 						</div>
 						<p>
 							{this.state.textToSpeak ? this.state.textToSpeak : ''}
@@ -98,14 +101,14 @@ class Component extends React.Component<{}, State> {
 
 	private async _trainPersonGroupAsync() {
 		console.debug('Training person group...')
-		await this._faceApi.trainPersonGroup()
+		await this._faceApi.trainPersonGroupAsync()
 		console.info('Training person group...DONE. Results may still take some time.')
 		await this._updatePersonGroupTrainingStatusAsync()
 	}
 
 	private async _updatePersonGroupTrainingStatusAsync() {
 		console.debug('Query person group training status...')
-		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatus()
+		const trainingStatus = await this._faceApi.getPersonGroupTrainingStatusAsync()
 		console.info('Query person group training status...DONE.', trainingStatus)
 		alert('Status trening av ansikter i persongruppe:\n' + JSON.stringify(trainingStatus))
 	}
@@ -113,7 +116,7 @@ class Component extends React.Component<{}, State> {
 	private async _deleteIncompletePersons() {
 		console.debug('Delete incomplete persons...')
 		const faceApiPersons = await this._faceApi.getPersonsAsync()
-		const settings = await settingsStore.getSettingsAsync()
+		const settings = await this.props.dataStore.settingsStore.getSettingsAsync()
 
 		const faceApiPersonsWithoutSettings = faceApiPersons.filter(fp => settings.persons.findIndex(sp => sp.personId === fp.personId) < 0)
 		const settingsPersonsWithoutFaceApi = settings.persons.filter(sp => faceApiPersons.findIndex(fp => sp.personId === fp.personId) < 0)
@@ -126,7 +129,7 @@ class Component extends React.Component<{}, State> {
 		if (faceApiPersonsWithoutSettings.length > 0) {
 			try {
 			console.debug(`Delete ${faceApiPersonsWithoutSettings.length} persons from Face API without settings entry...`)
-			await Promise.all(faceApiPersonsWithoutSettings.map(p => this._faceApi.deletePersonAsync(p.personId)))
+			await Promise.all(faceApiPersonsWithoutSettings.map(p => this._faceApi.removePersonAsync(p.personId)))
 			console.info(`Delete ${faceApiPersonsWithoutSettings.length} persons from Face API without settings entry...OK.`)
 			} catch (err) {
 				console.error(`Failed to delete one or more Face API persons.`, err)
@@ -136,7 +139,7 @@ class Component extends React.Component<{}, State> {
 		if (settingsPersonsWithoutFaceApi.length > 0) {
 			try {
 				console.debug(`Delete ${settingsPersonsWithoutFaceApi.length} persons from settings without Face API entry...`)
-				await Promise.all(settingsPersonsWithoutFaceApi.map(p => settingsStore.deletePersonAsync(p.personId)))
+				await Promise.all(settingsPersonsWithoutFaceApi.map(p => this.props.dataStore.settingsStore.deletePersonAsync(p.personId)))
 				console.info(`Delete ${settingsPersonsWithoutFaceApi.length} persons from settings without Face API entry...OK.`)
 			} catch (err) {
 				console.error(`Failed to delete one or more persons from settings.`, err)

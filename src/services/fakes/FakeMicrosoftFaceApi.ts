@@ -15,6 +15,9 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	public addPersonFaceWithImageBlobAsync(personId: string, imageDataUrl: string): Promise<AddPersonFaceResponse> {
 		throw new Error('Method not implemented.')
 	}
+	public removePersonAsync(personId: string): Promise<void> {
+		throw new Error('Method not implemented.')
+	}
 	public createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse> {
 		throw new Error('Method not implemented.')
 	}
@@ -24,10 +27,10 @@ export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
 	public getPersonsAsync(): Promise<Person[]> {
 		throw new Error('Method not implemented.')
 	}
-	public getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
+	public getPersonGroupTrainingStatusAsync(): Promise<PersonGroupTrainingStatus> {
 		throw new Error('Method not implemented.')
 	}
-	public trainPersonGroup(): Promise<void> {
+	public trainPersonGroupAsync(): Promise<void> {
 		throw new Error('Method not implemented.')
 	}
 

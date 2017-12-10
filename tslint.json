@@ -18,6 +18,9 @@
     "no-var-requires": false,
     "interface-name": false,
     "no-console": false,
-    "arrow-parens": false
+    "arrow-parens": false,
+    "no-unused-variable": true,
+    "no-unused-expression": true,
+    "no-unnecessary-qualifier": true
   }
 }

@@ -3,6 +3,7 @@ import * as React from 'react'
 export interface Props {
 	desiredWidth: number
 	desiredHeight: number
+	initialPhotoDataUrl?: string
 	onPhotoDataUrlChanged: (photoDataUrl?: string) => void
 }
 
@@ -12,8 +13,7 @@ interface State {
 	videoHeight: number
 }
 
-const noop = () => {/*noop*/ }
-type VisibilityType = 'visible' | 'hidden' | 'collapse'
+function noop() { /*noop*/ }
 
 function visibleStyle<T>(val: T, ...args: T[]): { display?: 'none' } {
 	const show = args.indexOf(val) >= 0
@@ -54,15 +54,19 @@ class Component extends React.Component<Props, State> {
 	}
 
 	public render() {
-		const { desiredWidth, desiredHeight } = this.props
 		const { state, videoWidth, videoHeight } = this.state
 
 		return (
 			<div style={{ display: 'flex', flexDirection: 'column' }}>
+				<img src={this.props.initialPhotoDataUrl} style={{
+					background: '#666',
+					width: '100%',
+					...visibleStyle(state, 'notstarted'),
+				}} />
 				<video style={{
 					background: '#666',
 					width: '100%',
-					...visibleStyle(state, 'notstarted', 'capturing'),
+					...visibleStyle(state, 'capturing'),
 				}}
 					ref={(video) => this._video = video || undefined}>Video stream not available.</video>
 
@@ -139,7 +143,7 @@ class Component extends React.Component<Props, State> {
 			this._videoStream = stream
 			this._video.srcObject = stream
 
-			this._video.onloadedmetadata = (e) => {
+			this._video.onloadedmetadata = (_) => {
 				if (!this._video) { console.error('No video element.'); return }
 				this.setState({ videoWidth: this._video.videoWidth, videoHeight: this._video.videoHeight })
 				this._video.play()

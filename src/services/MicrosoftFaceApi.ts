@@ -3,7 +3,7 @@ import { IdentifyFacesResponse } from '../../docs/FaceAPI/IdentifyFacesResponse'
 import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus'
 
-import { withTimeout } from '../services/utils/'
+import { withTimeout } from './utils/'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 const TIMEOUT = 10000
@@ -30,6 +30,8 @@ export interface IMicrosoftFaceApi {
 	createPersonAsync(name: string, userData?: UserData): Promise<CreatePersonResponse>
 	/** Create an anonymous person in a person group given one or more persisted face IDs from @see detectFacesAsync */
 	createAnonymousPersonWithFacesAsync(imageDataUrls: string[]): Promise<Person>
+	/** Remove person from this person group. */
+	removePersonAsync(personId: AAGUID): Promise<void>
 	/**
 	 * Detect face and analyze facial attributes of photo with Microsoft Face API.
 	 * @param {string} imageDataUrl URL encoded representation of image, obtained by canvas.toDataUrl()
@@ -45,7 +47,7 @@ export interface IMicrosoftFaceApi {
 	/** Get all persons in person group. */
 	getPersonsAsync(): Promise<Person[]>
 	/** Get person group face image training status. */
-	getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus>
+	getPersonGroupTrainingStatusAsync(): Promise<PersonGroupTrainingStatus>
 	/**
 	 * Identify up to 10 faces given a list of face IDs from a prior call to detectFaces().
 	 * @param {Array} Array of query faces faceIds, created by the detectFace(). Each of the faces are identified independently.
@@ -55,7 +57,7 @@ export interface IMicrosoftFaceApi {
 	 */
 	identifyFacesAsync(faceIds: AAGUID[]): Promise<IdentifyFacesResponse>
 	/** Start training the persisted face images for identifying faces later. */
-	trainPersonGroup(): Promise<void>
+	trainPersonGroupAsync(): Promise<void>
 }
 
 export class MicrosoftFaceApi implements IMicrosoftFaceApi {
@@ -111,7 +113,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	}
 
 	/** @inheritdoc */
-	public async deletePersonAsync(personId: AAGUID): Promise<void> {
+	public async removePersonAsync(personId: AAGUID): Promise<void> {
 		console.debug(`MicrosoftFaceApi: Delete person [${personId}]...`)
 		const method = 'DELETE'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/persons/${personId}`
@@ -263,7 +265,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	}
 
 	/** @inheritdoc */
-	public async trainPersonGroup(): Promise<void> {
+	public async trainPersonGroupAsync(): Promise<void> {
 		const method = 'POST'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/train`
 		const headers = this._getDefaultHeaders()
@@ -278,7 +280,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 	}
 
 	/** @inheritdoc */
-	public async getPersonGroupTrainingStatus(): Promise<PersonGroupTrainingStatus> {
+	public async getPersonGroupTrainingStatusAsync(): Promise<PersonGroupTrainingStatus> {
 		const method = 'GET'
 		const url = `${this._endpoint}persongroups/${this._personGroupId}/training`
 		const headers = this._getDefaultHeaders()

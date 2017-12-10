@@ -29,8 +29,8 @@ class PersonEditor extends React.Component<Props, State> {
 			<form style={{marginTop: '1em'}}>
 				{this._renderJokeEditors(person.jokes)}
 				<div className='form-group' style={{marginTop: '1em'}}>
-					<button type='button' role='button' className='btn btn-primary' onClick={ev => { this.props.savePerson(person) }}>Lagre</button>
-					<button type='button' role='button' className='btn btn-default' onClick={ev => this._addJoke()}>Legg til</button>
+					<button type='button' role='button' className='btn btn-primary' onClick={_ => { this.props.savePerson(person) }}>Lagre</button>
+					<button type='button' role='button' className='btn btn-default' onClick={_ => this._addJoke()}>Legg til</button>
 				</div>
 			</form>
 		)
@@ -39,11 +39,10 @@ class PersonEditor extends React.Component<Props, State> {
 	private _renderJokeEditors(jokes: string[]) {
 		return jokes.map((joke, idx) => {
 			const autoFocus = idx === jokes.length - 1
-			const onJokeChanged = (value: string) => { jokes[idx] = value }
 			return (
 				<div className='input-group' key={idx}>
 					<span className='input-group-btn'>
-						<button className='btn btn-sm btn-default' type='button' onClick={ev => this._removeJoke(idx)}>X</button>
+						<button className='btn btn-sm btn-default' type='button' onClick={_ => this._removeJoke(idx)}>X</button>
 					</span>
 					<input type='text' className='form-control' placeholder='Skriv en kommentar'
 						defaultValue={joke}

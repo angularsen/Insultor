@@ -17,7 +17,7 @@ describe('SimpleCrypto', () => {
 	it('Throws error trying to decrypt with wrong passphrase', async () => {
 		const encrypted = await SimpleCrypto.encryptText('I am secretly in love with you', 'and that is my little secret')
 		try {
-			const decrypted = await SimpleCrypto.decryptText(encrypted, 'but I forgot the secret')
+			await SimpleCrypto.decryptText(encrypted, 'but I forgot the secret')
 		} catch (err) {
 			expect(() => { throw err }).toThrow()
 		}
@@ -26,7 +26,7 @@ describe('SimpleCrypto', () => {
 		const differentIv = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
 		const encrypted = await SimpleCrypto.encryptText('I am secretly in love with you', 'and that is my little secret')
 		try {
-			const decrypted = await SimpleCrypto.decryptText({ ...encrypted, iv: differentIv }, 'and that is my little secret')
+			await SimpleCrypto.decryptText({ ...encrypted, iv: differentIv }, 'and that is my little secret')
 		} catch (err) {
 			expect(() => { throw err }).toThrow()
 		}

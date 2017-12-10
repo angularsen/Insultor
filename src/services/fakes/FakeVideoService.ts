@@ -4,9 +4,6 @@ export class FakeVideoService implements IVideoService {
 	constructor() {
 		console.log('FakeVideoService.ctor()')
 	}
-	public drawCurrentImageOnCanvas(canvas: HTMLCanvasElement): void {
-		throw new Error('Method not implemented.')
-	}
 	public getCurrentImageDataUrl() {
 		return 'Fake image data URL'
 	}

@@ -1,12 +1,12 @@
-import { format } from 'date-fns'
 import * as React from 'react'
 // import { Option } from 'src/services/utils/TsOption'
-import { debounce, min } from 'underscore'
+import { debounce } from 'underscore'
+
 import Selfie from '../components/Selfie'
-import { faceApiConfig } from '../services/constants'
-import FaceApi, { HttpError } from '../services/MicrosoftFaceApi'
-import { getDefaultSettings, PersonSettings, Settings, settingsStore } from '../services/Settings'
+import { DataStore } from '../services/DataStore'
+import { PersonSettings, Settings, SettingsStore } from '../services/Settings'
 import { flatten } from '../services/utils'
+
 import PersonList from './PersonList'
 
 interface State {
@@ -14,29 +14,36 @@ interface State {
 	canAddPerson: boolean
 }
 
-class Component extends React.Component<{}, State> {
+interface Props {
+	dataStore: DataStore
+}
+
+class Component extends React.Component<Props, State> {
 	private _lastAutoFilledNickname: string = ''
 	private _selfie: Selfie | null
 	private _addFirstName: HTMLInputElement | null // Option<HTMLInputElement>
 	private _addLastName: HTMLInputElement | null // Option<HTMLInputElement>
 	private _addNickname: HTMLInputElement | null // Option<HTMLInputElement>
 
-	private readonly _faceApi = new FaceApi(faceApiConfig.myPersonalSubscriptionKey, faceApiConfig.endpoint, faceApiConfig.webstepPersonGroupId)
+	private readonly settingsStore: SettingsStore
 
 	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
 		console.info('Saved github API token to localstorage.')
-		settingsStore.githubApiToken = value
+		this.settingsStore.githubApiToken = value
 		this._loadSettingsAsync(true)
 	}, 1000)
 
 	private readonly _onGitHubRepoUrlChange = debounce((value: string) => {
 		console.info('Saved GitHub repo URL to localstorage.')
-		settingsStore.githubRepoUrl = value
+		this.settingsStore.githubRepoUrl = value
 		this._loadSettingsAsync(true)
 	}, 1000)
 
-	constructor(props: {}) {
+	constructor(props: Props) {
 		super(props)
+
+		const { settingsStore } = props.dataStore
+		this.settingsStore = settingsStore
 
 		this.state = {
 			settings: settingsStore.currentSettingsOrDefault,
@@ -66,7 +73,7 @@ class Component extends React.Component<{}, State> {
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub konto token</label>
 								<input id='githubToken' className='form-control'
-									defaultValue={settingsStore.githubApiToken}
+									defaultValue={this.settingsStore.githubApiToken}
 									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
 									onChange={ev => this._onGitHubApiTokenChange(ev.currentTarget.value)} />
 							</div>
@@ -74,7 +81,7 @@ class Component extends React.Component<{}, State> {
 							<div className='form-group'>
 								<label htmlFor='gistUrl'>GitHub repo</label>
 								<input id='gistUrl' type='url' className='form-control'
-									defaultValue={settingsStore.githubRepoUrl}
+									defaultValue={this.settingsStore.githubRepoUrl}
 									placeholder='Eks: https://gist.github.com/{username}/{id}'
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
 							</div>
@@ -85,7 +92,7 @@ class Component extends React.Component<{}, State> {
 
 						<h2>Personer</h2>
 						<form>
-							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={photo => this._updateCanAddPerson()} />
+							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={_ => this._updateCanAddPerson()} />
 							<div className='form-group'>
 								<label htmlFor='addFirstName'>Fornavn</label>
 								<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola'
@@ -95,17 +102,17 @@ class Component extends React.Component<{}, State> {
 							<div className='form-group'>
 								<label htmlFor='addLastName'>Etternavn</label>
 								<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann'
-									onChange={ev => { this._updateCanAddPerson() }}
+									onChange={_ => { this._updateCanAddPerson() }}
 									ref={(x) => this._addLastName = x/*Option.from(x)*/} />
 							</div>
 							<div className='form-group'>
 								<label htmlFor='addNickname'>Kallenavn</label>
 								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola'
-									onChange={ev => { this._updateCanAddPerson() }}
+									onChange={_ => { this._updateCanAddPerson() }}
 									ref={(x) => this._addNickname = x/*Option.from(x)*/} />
 							</div>
 							<button type='button' className='btn btn-primary'
-								onClick={ev => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
+								onClick={_ => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
 						<PersonList persons={persons} deletePerson={personId => this._tryDeletePersonAsync(personId)} savePerson={person => this._updatePersonAsync(person)} />
@@ -119,7 +126,7 @@ class Component extends React.Component<{}, State> {
 	private async _loadSettingsAsync(force = false): Promise<void> {
 		try {
 			console.info(`Loading settings (force: ${force})...`)
-			const settings = await settingsStore.getSettingsAsync(force)
+			const settings = await this.settingsStore.getSettingsAsync(force)
 			this.setState({ settings })
 			console.info(`Loading settings (force: ${force})...OK`)
 		} catch (err) {
@@ -128,13 +135,10 @@ class Component extends React.Component<{}, State> {
 	}
 
 	private async _createPersonAsync(): Promise<void> {
-		// this._addFirstName.map(firstName => {
-		// 	return firstName
-		// })
-		// this._addLastName.flatMap(lastName => this._addNickname.map(nickname => {})))
 		const firstName = this._addFirstName && this._addFirstName.value
 		const lastName = this._addLastName && this._addLastName.value
 		const nickname = this._addNickname && this._addNickname.value
+
 		if (!this._selfie) {
 			alert('Fotoboks er ikke klar enda.')
 			return
@@ -149,88 +153,43 @@ class Component extends React.Component<{}, State> {
 			return
 		}
 
-		const name = `${firstName} ${lastName}`
-		const createPersonRes = await this._faceApi.createPersonAsync(name)
-		const personId = createPersonRes.personId
-
-		const settings = await settingsStore.getSettingsAsync()
-		if (settings.persons.find(p => p.personId === personId)) {
-			throw new Error('Person with same ID is already added.')
-		}
-
-		// TODO Handle errors uploading image (try again, if not try to roll back face API person)
-		// Ex: "Andreas Gullberg Larsen (ab341234-a4542..)/2017-12-05T21-46-32_300x300.jpg"
-		const remoteDirPath = `${name} (${personId})`
-		const fileName = `${format(new Date(), 'YYYY-MM-DDTHH-mm-ss')}_${photoWidth}-${photoHeight}.jpg`
-		const remoteFilePath = `${remoteDirPath}/${fileName}`
-		const uploadedImageFile = await settingsStore.uploadImageByDataUrlAsync(photoDataUrl, remoteFilePath)
-
-		// Add person to settings with URL to uploaded image
-		settings.persons.push({
-			name,
+		await this.props.dataStore.addPersonAsync({
+			firstName,
 			jokes: ['Hei kjekken!'],
-			personId,
-			photos: [
-				{
-					path: remoteFilePath,
-					url: uploadedImageFile.content.download_url,
-					height: photoHeight,
-					width: photoWidth },
-			],
+			lastName,
+			nickname,
+			photoDataUrl,
+			photoHeight,
+			photoWidth,
 		})
-		await settingsStore.saveSettingsAsync(settings)
-		this.setState({ settings })
-
-		await this._addPersonFacesForPhotosWithNoFace()
-		await this._faceApi.trainPersonGroup()
 
 		this._clearAddPersonFields()
+
+		const settings = await this.settingsStore.getSettingsAsync()
+		this.setState({ settings })
 	}
 
 	private async _tryDeletePersonAsync(personId: AAGUID): Promise<void> {
 		console.debug(`Delete person [${personId}]...`)
 		try {
-			console.debug(`Removing person [${personId}] from Face API...`)
-			try {
-				await this._faceApi.deletePersonAsync(personId)
-			} catch (err) {
-				if (err instanceof HttpError && err.statusCode === 404) {
-					console.warn('Person does not exist or was already deleted from Face API.', err)
-				} else {
-					throw err
-				}
-			}
-			console.debug(`Removing person [${personId}] from Face API...OK.`)
-
-			const settings = await settingsStore.getSettingsAsync()
-			const personIdx = settings.persons.findIndex(p => p.personId === personId)
-			if (personIdx < 0) {
-				console.warn('Person does not exist in settings: ' + personId)
-				return
-			}
-
-			const person = settings.persons[personIdx]
-			const filePaths = person.photos.map(x => x.path)
-			await settingsStore.deleteFilesAsync(filePaths)
-
-			// Remove from settings
-			console.debug(`Removing person [${personId}] from settings...`)
-			settings.persons = settings.persons.filter(p => p.personId !== personId)
-			await settingsStore.saveSettingsAsync(settings)
-			console.info(`Removing person [${personId}] from settings...OK.`)
+			const settings = await this.props.dataStore.removePersonAsync(personId)
 
 			// Update UI
 			this.setState({ settings })
-
-			console.info(`Delete person [${personId}]...OK.`)
 		} catch (err) {
 			console.error(`Delete person [${personId}]...ERROR.`, err)
 		}
 	}
 
+	/**
+	 * This is a cleanup task, adding faces for person in Face API for photos in settings
+	 * that are not associated with a face. This typically happens when a person was created
+	 * in settings, but an error prevented the face from being created in Face API.
+	 * The idea is to retry this later (with this function).
+	 */
 	private async _addPersonFacesForPhotosWithNoFace(): Promise<void> {
 		console.debug(`Add person faces for photos with no face...`)
-		const settings = await settingsStore.getSettingsAsync()
+		const settings = await this.settingsStore.getSettingsAsync()
 
 		// Add person faces for any photos that are not already added
 		const photosWithNoFace = flatten(
@@ -252,7 +211,7 @@ class Component extends React.Component<{}, State> {
 		try {
 			for (const p of photosWithNoFace) {
 				try {
-					const addedFace = await this._faceApi.addPersonFaceWithUrlAsync(p.personId, p.photo.url)
+					const addedFace = await this.props.dataStore.faceApi.addPersonFaceWithUrlAsync(p.personId, p.photo.url)
 					p.photo.personFaceId = addedFace.persistedFaceId
 					console.debug(`Add new face ID [${p.photo.personFaceId}] to photo [${p.photo.url}] in settings.`)
 				} catch (err) {
@@ -261,7 +220,7 @@ class Component extends React.Component<{}, State> {
 			}
 
 			console.debug('Update settings with new face IDs.')
-			await settingsStore.saveSettingsAsync(settings)
+			await this.settingsStore.saveSettingsAsync(settings)
 			this.setState({ settings })
 
 			console.info(`Add person faces for photos with no face...OK`)
@@ -301,7 +260,7 @@ class Component extends React.Component<{}, State> {
 	}
 
 	private async _updatePersonAsync(person: PersonSettings) {
-		const settings = await settingsStore.getSettingsAsync()
+		const settings = await this.settingsStore.getSettingsAsync()
 		const personIdx = settings.persons.findIndex(p => p.personId === person.personId)
 		if (personIdx < 0) {
 			console.error(`Could not find person in settings with id [${person.personId}].`)
@@ -312,7 +271,7 @@ class Component extends React.Component<{}, State> {
 		person.jokes = person.jokes.filter(j => j && j.trim() !== '')
 
 		settings.persons[personIdx] = person
-		await settingsStore.saveSettingsAsync(settings)
+		await this.settingsStore.saveSettingsAsync(settings)
 		this.setState({ settings })
 	}
 }

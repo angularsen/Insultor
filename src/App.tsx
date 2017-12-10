@@ -1,9 +1,12 @@
 import * as React from 'react'
-import * as ReactDOM from 'react-dom'
 import { NavLink, Route, Switch } from 'react-router-dom'
 
 import About from './About'
 import InsultMyFace from './InsultMyFace'
+import { faceApiConfig } from './services/constants'
+import { DataStore } from './services/DataStore'
+import { MicrosoftFaceApi } from './services/MicrosoftFaceApi'
+import { SettingsStore } from './services/Settings'
 import Settings from './Settings'
 import TestBin from './TestBin'
 
@@ -48,6 +51,13 @@ const navBarLogoStyle: React.CSSProperties = {
 	height: 30,
 }
 
+const faceApi = new MicrosoftFaceApi(
+	faceApiConfig.myPersonalSubscriptionKey,
+	faceApiConfig.endpoint,
+	faceApiConfig.webstepPersonGroupId)
+
+const dataStore = new DataStore(faceApi, new SettingsStore())
+
 const activeLinkStyle: React.CSSProperties = { color: 'yellow', fontWeight: 'bold' }
 
 // tslint:disable-next-line:variable-name
@@ -73,9 +83,9 @@ const Header: React.StatelessComponent<{}> = () => (
 const Main: React.StatelessComponent<{}> = () => (
 	<main style={{padding: '0em', backgroundColor: '#f6f6f6', margin: '0 auto', minHeight: '90vh' }}>
 		<Switch>
-			<Route exact path='/' component={InsultMyFace}/>
-			<Route exact path='/testbin' component={TestBin}/>
-			<Route exact path='/settings' component={Settings}/>
+			<Route exact path='/' render={() => (<InsultMyFace dataStore={dataStore} />)}/>
+			<Route exact path='/testbin' render={() => (<TestBin dataStore={dataStore} />)}/>
+			<Route exact path='/settings' render={() => (<Settings dataStore={dataStore} />)}/>
 			<Route path='/about' component={About}/>
 		</Switch>
 	</main>

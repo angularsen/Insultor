@@ -64,11 +64,11 @@ class PersonList extends React.Component<Props, State> {
 					<ul style={{ listStyle: 'none', paddingLeft: 0 }}>{p.jokes.map(renderJoke)} </ul>
 					{showEditor
 						? (<button className='btn btn-default'
-							onClick={ev => this.setState({ showEditorForPersonId: undefined })}>{'Lukk'}</button>)
+							onClick={_ => this.setState({ showEditorForPersonId: undefined })}>{'Lukk'}</button>)
 						: (<button className='btn btn-primary'
-							onClick={ev => this.setState({ showEditorForPersonId: personId })}>{'Endre'}</button>)}
+							onClick={_ => this.setState({ showEditorForPersonId: personId })}>{'Endre'}</button>)}
 
-					<button className='btn btn-danger' onClick={ev => this.props.deletePerson(personId)}>Slett</button>
+					<button className='btn btn-danger' onClick={_ => this.props.deletePerson(personId)}>Slett</button>
 
 					{showEditor
 						? (<PersonEditor person={p} savePerson={person => this.props.savePerson(person)} />)

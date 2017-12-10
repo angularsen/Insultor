@@ -1,6 +1,6 @@
 import { DetectFaceResult } from '../../docs/FaceAPI/DetectFacesResponse'
-import { Person } from '../../docs/FaceAPI/Person'
-import { Settings, SettingsStore } from '../services/Settings'
+
+import { Settings, SettingsStore } from './Settings'
 import JokeProvider from './JokeProvider'
 
 function getRandomInt(min: number, max: number) {
@@ -8,7 +8,7 @@ function getRandomInt(min: number, max: number) {
 }
 
 export interface PersonInfo {
-	person: Person
+	personId: AAGUID
 	face: DetectFaceResult
 }
 
@@ -32,7 +32,7 @@ export class CommentProvider implements ICommentProvider {
 			return 'Jeg er ikke klar for å vitse enda.'
 		}
 
-		const personId = info.person.personId
+		const personId = info.personId
 
 		const personSettings = settings.persons.find(p => p.personId === personId)
 		if (!personSettings || !personSettings.jokes || personSettings.jokes.length === 0) {
