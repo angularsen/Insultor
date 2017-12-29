@@ -1,6 +1,6 @@
 import { differenceInMilliseconds } from 'date-fns'
 // Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
-import { clearTimeout, setTimeout } from 'timers'
+import { setTimeout } from 'timers'
 
 import { IdentifyFacesResponse } from '../../../docs/FaceAPI/IdentifyFacesResponse'
 
@@ -9,16 +9,19 @@ import { DataStore } from '../DataStore'
 import { IMicrosoftFaceApi, ThrottledHttpError } from '../MicrosoftFaceApi'
 import { DetectedFaceWithImageData, IPeriodicFaceDetector, PeriodicFaceDetector } from '../PeriodicFaceDetector'
 import { IPresenceDetector } from '../PresenceDetector'
-import { Settings, SettingsStore } from '../Settings'
-import { ISpeech, SpeakData } from '../Speech'
+import { PersonSettings, Settings, SettingsStore } from '../Settings'
+import { ISpeech } from '../Speech'
 import { Lifecycle, TypedStateMachine } from '../TypedStateMachine'
+import { checkDefined, delayAsync, joinGrammatically, strEnum } from '../utils'
 import { EventDispatcher, IEvent } from '../utils/Events'
 import { error } from '../utils/format'
-import { checkDefined, strEnum, delayAsync } from '../utils'
 import { IVideoService } from '../VideoService'
 
+import DetectIdentifyCommentCycleData from './DetectIdentifyCommentCycleData'
+import Sounds from './Sounds'
 import { IdentifiedPerson, PersonToCommentOn, PersonToCreate } from './types'
-import DetectIdentifyCommentCycleData from './DetectIdentifyCommentCycleData';
+
+export { default as Sounds } from './Sounds'
 
 //#region Internal types
 
@@ -34,6 +37,7 @@ interface InputOpts {
 	videoService: IVideoService
 	commentProvider: ICommentProvider
 	speech: ISpeech
+	sounds: Sounds
 
 	// Optional
 	detectFacesIntervalMs?: number
@@ -45,6 +49,7 @@ interface CommentatorOptions {
 	commentProvider: ICommentProvider
 	detectFacesIntervalMs: number
 	dataStore: DataStore
+	sounds: Sounds
 	faceDetector?: IPeriodicFaceDetector
 	init: State
 	presenceDetector: IPresenceDetector
@@ -66,24 +71,6 @@ export interface StatusInfo {
 	emoji: string
 	state: State
 	text: string
-}
-
-export interface DeliverCommentData {
-	/** The detected face ID */
-	imageDataUrl: string
-	/** The name of the person if identified */
-	name: string
-	/** ID of person if identified. */
-	personId: string
-	/** The speech data for the comment being delivered */
-	speech: SpeakData
-	/** When comment was delivered, in order to throttle and avoid spam of certain persons. */
-	when: Date
-}
-
-export interface CommentOnPersonsPayload {
-	identifiedPersons: IdentifiedPerson[]
-	currentPersonIdx: number
 }
 
 // tslint:disable-next-line:variable-name
@@ -123,7 +110,7 @@ interface Transition {
 }
 type TransitionName = keyof Transition
 
-export type MyLifecycle = Lifecycle<State, TransitionName>
+export type CommentatorTransition = Lifecycle<State, TransitionName>
 
 //#endregion Exported types
 
@@ -139,7 +126,7 @@ export class Commentator implements Transition {
 
 			const personToCommentOn: PersonToCommentOn = {
 				comment,
-				identifiedPerson: p,
+				person: p,
 				state: 'scheduled',
 			}
 			return personToCommentOn
@@ -149,7 +136,7 @@ export class Commentator implements Transition {
 		return personsToCommentOn
 	}
 
-	private static getPersonSettingsOrDefault(settings: Settings, personId: string) {
+	private static getPersonSettingsOrDefault(settings: Settings, personId: string): PersonSettings {
 		const personSettings = settings.persons.find(p => p.personId === personId)
 		if (personSettings) { return personSettings }
 
@@ -157,26 +144,23 @@ export class Commentator implements Transition {
 		return {
 			jokes: ['Fant ingen vitser på deg, gitt.'],
 			name: 'Ukjent',
+			nickname: 'Ukjent',
 			personId,
 			photos: [],
 		}
 	}
 
-	public get onHasFaceApiActivity(): IEvent<boolean> { return this._onHasFaceApiActivityDispatcher }
-	public get onSpeakCompleted(): IEvent<void> { return this._onSpeakCompletedDispatcher }
-	public get onSpeak(): IEvent<DeliverCommentData> { return this._onSpeakDispatcher }
+	public get onSpeak(): IEvent<PersonToCommentOn> { return this._onSpeakDispatcher }
 	public get onAskToCreatePerson(): IEvent<PersonToCreate> { return this._onAskToCreatePersonDispatcher }
 	public get onCreatePerson(): IEvent<PersonToCreate> { return this._onCreatePersonDispatcher }
 	public get onStatusChanged(): IEvent<StatusInfo> { return this._onStatusChangedDispatcher }
-	public get onTransition(): IEvent<MyLifecycle> { return this._sm.onTransition }
+	public get onTransition(): IEvent<CommentatorTransition> { return this._sm.onTransition }
 	public get presenceDetector(): IPresenceDetector { return this._presenceDetector }
 	public get status(): StatusInfo { return this._status }
 
 	private readonly _sm: TypedStateMachine<State, Transition>
-	private readonly _onHasFaceApiActivityDispatcher = new EventDispatcher<boolean>()
 	private readonly _onStatusChangedDispatcher = new EventDispatcher<StatusInfo>()
-	private readonly _onSpeakCompletedDispatcher = new EventDispatcher<void>()
-	private readonly _onSpeakDispatcher = new EventDispatcher<DeliverCommentData>()
+	private readonly _onSpeakDispatcher = new EventDispatcher<PersonToCommentOn>()
 	private readonly _onAskToCreatePersonDispatcher = new EventDispatcher<PersonToCreate>()
 	private readonly _onCreatePersonDispatcher = new EventDispatcher<PersonToCreate>()
 	private readonly _faceDetector: IPeriodicFaceDetector
@@ -185,6 +169,7 @@ export class Commentator implements Transition {
 	private readonly _settingsStore: SettingsStore
 	private readonly _presenceDetector: IPresenceDetector
 	private readonly _speech: ISpeech
+	private readonly _sounds: Sounds
 	private readonly _videoService: IVideoService
 	private readonly _commentCooldownPerPersonMs = 60 * 1000
 
@@ -192,7 +177,7 @@ export class Commentator implements Transition {
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
 	 * to the same persons.
 	 */
-	private readonly _commentHistory: Map<string, DeliverCommentData> = new Map<string, DeliverCommentData>()
+	private readonly _commentHistory: Map<string, PersonToCommentOn> = new Map<string, PersonToCommentOn>()
 
 	/**
 	 * Data for current detect-identify-comment cycle.
@@ -229,6 +214,7 @@ export class Commentator implements Transition {
 		this._onEnterWaitForThrottling = this._onEnterWaitForThrottling.bind(this)
 	//#endregion Bind
 
+		this._sounds = opts.sounds
 		this._commentProvider = opts.commentProvider
 		this._faceApi = opts.dataStore.faceApi
 		this._settingsStore = opts.dataStore.settingsStore
@@ -253,7 +239,7 @@ export class Commentator implements Transition {
 			},
 			states: {
 				any: { allow: { stop: { to: 'idle' } } },
-				idle: { allow: { start: { to: 'detectPresence' } }, onEnter: this._onEnterIdle },
+				idle: { allow: { start: { to: 'detectPresence' } }, onEnter: this._onEnterIdle, ignore: ['commentOnNextPerson_Delivered'] },
 				detectPresence: { allow: { presenceDetected: { to: 'detectFaces' } }, onEnter: this._onEnterDetectPresence },
 				detectFaces: {
 					onEnter: this._onEnterDetectFaces,
@@ -402,26 +388,26 @@ export class Commentator implements Transition {
 		}
 	}
 
-	/**
-	 * Returns a promise that resolves when it enters the given state, however
-	 * it may have continued entering other states by the time the resolve
-	 * handler is invoked.
-	 */
-	public waitForState(state: State, timeoutMs: number = 1000): Promise < void > {
-		return new Promise((resolve, reject) => {
-			const timeoutHandle = setTimeout(() => reject(new Error('Timed out waiting for state: ' + state)), timeoutMs)
-			this._sm.onTransition.subscribe((onTransition) => {
-				if (onTransition.to === state) {
-					resolve()
-					clearTimeout(timeoutHandle)
-				}
-			})
-		})
-	}
+	// /**
+	//  * Returns a promise that resolves when it enters the given state, however
+	//  * it may have continued entering other states by the time the resolve
+	//  * handler is invoked.
+	//  */
+	// public waitForState(state: State, timeoutMs: number = 1000): Promise < void > {
+	// 	return new Promise((resolve, reject) => {
+	// 		const timeoutHandle = setTimeout(() => reject(new Error('Timed out waiting for state: ' + state)), timeoutMs)
+	// 		this._sm.onTransition.subscribe((onTransition) => {
+	// 			if (onTransition.to === state) {
+	// 				resolve()
+	// 				clearTimeout(timeoutHandle)
+	// 			}
+	// 		})
+	// 	})
+	// }
 	//#endregion Public
 
 	//#region _onEnter
-	private _onEnterIdle(lifecycle: MyLifecycle) {
+	private _onEnterIdle(transition: CommentatorTransition) {
 		console.info('_onIdle')
 
 		this._setStatus('Zzzz...', '😴')
@@ -433,23 +419,22 @@ export class Commentator implements Transition {
 		this._commentHistory.clear()
 	}
 
-	private _onEnterDetectPresence(lifecycle: MyLifecycle) {
+	private _onEnterDetectPresence(transition: CommentatorTransition) {
 		console.info('_onDetectPresence')
-		if (lifecycle.from === 'idle') {
+		if (transition.from === 'idle') {
 			this._setStatus('Hei.. er det noen her?', '🙂')
 			this._videoService.start()
 			this._presenceDetector.start(200)
 		} else {
 			this._setStatus('Forlatt og alene igjen...', '😟')
+			this._sounds.playAloneAgain()
 			this._faceDetector.stop()
 		}
 
 		this._hasIdentifiedFacesInCurrentPresence = false
 	}
 
-	private _onEnterDetectFaces(lifecycle: MyLifecycle) {
-		console.info('_onDetectFaces')
-
+	private _onEnterDetectFaces(transition: CommentatorTransition) {
 		// Reset the cycle data on detect faces, which is where we enter back to after commenting on persons, and we have the chance to start a new cycle if
 		// faces were detected during the last cycle
 		const prevCycleData = this._cycleData
@@ -461,33 +446,47 @@ export class Commentator implements Transition {
 			return
 		}
 
-		// Ensure it is started
+		// Faces detected during cycle will not have had its face identified, so do another cycle with these faces
+		const facesDetectedDuringCycle = prevCycleData.facesDetectedDuringCycle
+		if (facesDetectedDuringCycle.length > 0) {
+			console.info(`${facesDetectedDuringCycle.length} faces were detected in the meantime, immediately start identifying them.`)
+
+			// Trigger a new cycle
+			this.detectedFaces(facesDetectedDuringCycle)
+		} else {
+			console.info('User is still present, will keep trying to detect faces in the background.')
+			this._setStatus(`Er det noen andre her...?`, '😑')
+		}
+
+		// Ensure it is started, could have been stopped if last cycle went through askToCreatePerson state
 		this._faceDetector.start()
 
-		switch (lifecycle.from) {
-			case 'detectPresence': {
+		if (transition.transitionName === 'presenceDetected') {
+				this._sounds.playPresenceDetectedAsync()
 				console.info('Presence was just detected, proceeding to attempt to detect faces.')
 				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
-				break
-			}
-			default: {
-				// Faces detected during cycle will not have had its face identified, so do another cycle with these faces
-				const facesDetectedDuringCycle = prevCycleData.facesDetectedDuringCycle
-				if (facesDetectedDuringCycle.length > 0) {
-					console.info(`${facesDetectedDuringCycle.length} faces were detected in the meantime, immediately start identifying them.`)
+		} else { // if (transition.transitionName === 'commentOnNextPerson_NoMoreComments') {
+			const personsCommentedOn = prevCycleData.personsToCommentOn
 
-					// Trigger a new cycle
-					this.detectedFaces(facesDetectedDuringCycle)
-				} else {
-					console.info('User is still present, continue to detect faces in the background.')
-					this._setStatus('Du er her fortsatt ja...', '😑')
-				}
-				break
+			// if (prevCycleData.faces)
+			if (personsCommentedOn.length > 0 && personsCommentedOn.every(p => p.state === 'skipped')) {
+				const nicknames = personsCommentedOn.map(p => p.person.settings.nickname)
+				const nicknamesText = joinGrammatically(nicknames, ' og ')
+				const youText = personsCommentedOn.length > 1 ? 'Dere' : 'Du'
+
+				// Avoid nagging on the same persons
+				this._setStatus(`${youText} er her fortsatt ja ${nicknamesText}...`, '😑')
+			} else if (prevCycleData.personsToCreate.length > 0) {
+				// There were new faces, but no comments delivered, which means they declined to join (or auto-declined)
+				this._setStatus(`Helt greit om du ikke vil bli med, men jeg spør igjen neste gang!`, '😏')
+			} else {
+				// Comments were delivered
+				this._setStatus(`Er det noen andre her..?`, '😏')
 			}
 		}
 	}
 
-	private _onEnterIdentifyFaces(lifecycle: MyLifecycle) {
+	private _onEnterIdentifyFaces(transition: CommentatorTransition) {
 		const { facesToIdentify } = this._cycleData
 		if (facesToIdentify.length === 0) {
 			throw new Error('No faces to identify, this should normally not happen.')
@@ -507,7 +506,7 @@ export class Commentator implements Transition {
 		this._identifyFacesAsync(facesToIdentify)
 	}
 
-	private _onEnterWaitForThrottling(lifecycle: MyLifecycle) {
+	private _onEnterWaitForThrottling(transition: CommentatorTransition) {
 		console.info('Wait 5 seconds for throttling...')
 		this._setStatus('Oops.. har brukt opp gratiskvoten, må vente litt!', '🙄')
 		setTimeout(() => {
@@ -516,16 +515,18 @@ export class Commentator implements Transition {
 		}, 5000)
 	}
 
-	private _onEnterProcessAnyNewFaces(lifecycle: MyLifecycle) {
+	private _onEnterProcessAnyNewFaces(transition: CommentatorTransition) {
 		const remainingPersonsToCreate = this._cycleData.getRemainingPersonsToCreate()
 		if (remainingPersonsToCreate.length > 0) {
 			this.processAnyNewFaces_Next()
 		} else {
+			const personsToCommentOn = Commentator.getPersonsToCommentOn(this._cycleData.identifiedPersons, this._commentProvider)
+			this._cycleData.addPersonsToCommentOn(personsToCommentOn)
 			this.processAnyNewFaces_Completed()
 		}
 	}
 
-	private _onEnterAskToCreatePerson(lifecycle: MyLifecycle) {
+	private _onEnterAskToCreatePerson(transition: CommentatorTransition) {
 		// Upon seeing a new face, stop face detector and clear any faces already detected to avoid spam asking to create person for same face many times
 		// Face detector will be started when entering back in detectFaces state
 		this._faceDetector.stop()
@@ -541,7 +542,7 @@ export class Commentator implements Transition {
 		this._onAskToCreatePersonDispatcher.dispatch(nextPersonToCreate)
 	}
 
-	private _onEnterCreatePerson(lifecycle: MyLifecycle) {
+	private _onEnterCreatePerson(transition: CommentatorTransition) {
 		const nextPersonToCreate = this._cycleData.getNextPersonToCreate()
 		if (!nextPersonToCreate) { throw new Error('No next face to create person from. Bug.') }
 
@@ -549,52 +550,48 @@ export class Commentator implements Transition {
 		this._onCreatePersonDispatcher.dispatch(nextPersonToCreate)
 	}
 
-	private _onEnterCommentOnNextPerson(lifecycle: MyLifecycle) {
-		if (lifecycle.from === 'processAnyNewFaces') {
-			this._cycleData.addPersonsToCommentOn(Commentator.getPersonsToCommentOn(this._cycleData.identifiedPersons, this._commentProvider))
-		}
-
-		const nextPerson = this._cycleData.getNextPersonToCommentOn()
+	private async _onEnterCommentOnNextPerson(transition: CommentatorTransition) {
+		const { nextPerson, idx, count } = this._cycleData.getNextPersonToCommentOn()
 		if (!nextPerson) {
 			this.commentOnNextPerson_NoMoreComments()
 			return
 		}
 
-		const { identifiedPerson } = nextPerson
-		if (!this._canCommentOnPerson(identifiedPerson.personId, identifiedPerson.settings.name)) {
+		if (!this._canCommentOnPerson(nextPerson.person)) {
 			this.commentOnNextPerson_TooEarly()
 			return
 		}
 
-		this._commentOnPersonAsync(identifiedPerson)
+		this._commentOnPersonAsync(nextPerson, idx, count)
 	}
 	//#endregion _onEnter
 
 	//#region Actions
-	private async _commentOnPersonAsync(person: IdentifiedPerson): Promise<void> {
-		const { detectedFace, personId, settings } = person
-		const { faceId, imageDataUrl } = detectedFace
-		const { name } = settings
+	private async _commentOnPersonAsync(personToCommentOn: PersonToCommentOn, idx: number, count: number): Promise<void> {
+		const personId = personToCommentOn.person.personId
+		const faceId = personToCommentOn.person.detectedFace.faceId
 
 		const comment = this._commentProvider.getCommentForPerson({
-			face: detectedFace.result,
+			face: personToCommentOn.person.detectedFace.result,
 			personId,
 		})
 
-		const logText = `Commenting on ${name ? `person ${name}` : `face ${faceId}`}`
+		const nickname = personToCommentOn.person.settings.nickname
+		const logText = `Commenting on ${nickname ? `person ${nickname}` : `face ${faceId}`}`
 		console.info(`${logText}...`)
-		const speech = this._speech.speak(comment)
 
-		const commentData: DeliverCommentData = { imageDataUrl, name, personId, speech, when: new Date() }
+		personToCommentOn.spokenOn = new Date()
+		this._commentHistory.set(personId, personToCommentOn)
 
-		this._commentHistory.set(personId, commentData)
-		this._onSpeakDispatcher.dispatch(commentData)
-		await speech.completion
-		await delayAsync(4000) // wait a bit longer to give the person time to see/read the comment visual
+		// Trigger UI to show visual for comment
+		this._onSpeakDispatcher.dispatch(personToCommentOn)
 
-		this._onSpeakCompletedDispatcher.dispatch(undefined)
-		this.commentOnNextPerson_Delivered()
+		await this._sounds.playAboutToCommentOnPersonAsync() // Heads up to user that a comment is about to be spoken
+		await this._speech.speakAsync(comment) // Speak
+		await delayAsync(4000) // Wait a bit to give user time to read/see the comment visuals
+
 		console.info(`${logText}...DONE`)
+		this.commentOnNextPerson_Delivered()
 	}
 
 	private async _identifyFacesAsync(detectedFaces: ReadonlyArray<DetectedFaceWithImageData>): Promise<void> {
@@ -608,9 +605,7 @@ export class Commentator implements Transition {
 			const MIN_CONFIDENCE = 0.5
 
 			console.debug(`Identifying ${detectedFaces.length} faces...`)
-			this._onHasFaceApiActivityDispatcher.dispatch(true)
 			const identifyFacesResponse: IdentifyFacesResponse = await this._faceApi.identifyFacesAsync(faceIds)
-			this._onHasFaceApiActivityDispatcher.dispatch(false)
 			console.debug(`Identifying ${detectedFaces.length} faces...Complete.`)
 
 			const settings = await this._settingsStore.getSettingsAsync()
@@ -649,15 +644,12 @@ export class Commentator implements Transition {
 		}
 	}
 
-	private async _onPeriodicDetectFacesAsync(): Promise < DetectedFaceWithImageData[] > {
+	private async _onPeriodicDetectFacesAsync(): Promise<DetectedFaceWithImageData[]> {
 		try {
-			console.debug(`On periodically detect faces...`)
 			const imageDataUrl = this._videoService.getCurrentImageDataUrl()
-			console.debug(`Got image data url, detecting faces...`)
-			this._onHasFaceApiActivityDispatcher.dispatch(true)
+			console.debug(`Detect faces in photo...`)
 			const result = await this._faceApi.detectFacesAsync(imageDataUrl)
-			this._onHasFaceApiActivityDispatcher.dispatch(false)
-			console.debug(`detect faces result`, result)
+			console.info(`Detect faces in photo...DONE.`, result)
 
 			return result.map(detectedFace => ({
 				faceId: detectedFace.faceId,
@@ -682,25 +674,29 @@ export class Commentator implements Transition {
 	//#endregion Actions
 
 	//#region Helpers
-	private _canCommentOnPerson(personId: AAGUID, personName: string): boolean {
-		const prevComment = this._commentHistory.get(personId)
+	private _canCommentOnPerson(person: IdentifiedPerson): boolean {
+		const prevComment = this._commentHistory.get(person.personId)
 		if (!prevComment) {
 			console.debug('OK, no previous comment.')
 			return true
 		}
 
-		const timeSinceLastMs = differenceInMilliseconds(new Date(), prevComment.when)
-		if (timeSinceLastMs > this._commentCooldownPerPersonMs) {
+		const timeSinceLastMs = prevComment.spokenOn ? differenceInMilliseconds(prevComment.spokenOn, new Date()) : undefined
+		if (timeSinceLastMs === undefined || timeSinceLastMs > this._commentCooldownPerPersonMs) {
 			console.debug('OK, long enough since previous comment.', timeSinceLastMs)
 			return true
 		}
 
 		const waitTimeText = `${Math.round((this._commentCooldownPerPersonMs - timeSinceLastMs) / 1000)} seconds`
-		console.info(`Too early to comment on person ${personName}, need to wait at least ${waitTimeText}.`)
+		console.info(`Too early to comment on person ${person.settings.name}, need to wait at least ${waitTimeText}.`)
 		return false
 	}
 
 	//#endregion
 }
 
-export default Commentator
+const defaultExport = {
+	Commentator,
+	Sounds,
+}
+export default defaultExport

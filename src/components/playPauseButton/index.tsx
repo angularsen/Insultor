@@ -2,8 +2,8 @@ import * as React from 'react'
 
 interface Props {
 	canStart: boolean
-	onStart(): void
-	onStop(): void
+	onStart(event: React.MouseEvent<HTMLButtonElement>): void
+	onStop(event: React.MouseEvent<HTMLButtonElement>): void
 }
 
 export default function render(props: Props) {

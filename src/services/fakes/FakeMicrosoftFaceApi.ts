@@ -3,8 +3,11 @@ import { IdentifyFacesResponse } from '../../../docs/FaceAPI/IdentifyFacesRespon
 import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '../../../docs/FaceAPI/Person'
 import PersonGroupTrainingStatus from '../../../docs/FaceAPI/PersonGroupTrainingStatus'
 import { IMicrosoftFaceApi } from '../MicrosoftFaceApi'
+import { EventDispatcher, IEvent } from '../utils/Events'
 
 export class FakeMicrosoftFaceApi implements IMicrosoftFaceApi {
+	public readonly onActivity: IEvent<boolean> = new EventDispatcher<boolean>()
+
 	constructor(
 		private readonly _detectFacesAsyncResult: Promise<DetectFacesResponse> = FakeMicrosoftFaceApi.defaultDetectFacesAsyncResult) {
 	}

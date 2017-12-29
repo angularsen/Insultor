@@ -4,6 +4,7 @@ import { AddPersonFaceResponse, CreatePersonResponse, Person, UserData } from '.
 import PersonGroupTrainingStatus from '../../docs/FaceAPI/PersonGroupTrainingStatus'
 
 import { withTimeout } from './utils/'
+import { EventDispatcher, IEvent } from './utils/Events'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
 const TIMEOUT = 10000
@@ -22,6 +23,8 @@ async function ensureSuccessAsync(res: Response) {
 }
 
 export interface IMicrosoftFaceApi {
+	/** Event raised on change in whether requests are currently in flight or not. */
+	readonly onActivity: IEvent<boolean>
 	/** Add face image to a person in a person group. */
 	addPersonFaceWithImageBlobAsync(personId: AAGUID, imageDataUrl: AAGUID): Promise<AddPersonFaceResponse>
 	/** Add face image to a person in a person group. */
@@ -61,6 +64,9 @@ export interface IMicrosoftFaceApi {
 }
 
 export class MicrosoftFaceApi implements IMicrosoftFaceApi {
+	public get onActivity(): IEvent<boolean> { return this._onActivityDispatcher }
+	private readonly _onActivityDispatcher = new EventDispatcher<boolean>()
+
 	constructor(
 		private readonly _subscriptionKey: string,
 		private readonly _endpoint: string,
@@ -100,6 +106,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		})
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 			await ensureSuccessAsync(res)
 			const person: CreatePersonResponse = await res.json()
@@ -109,6 +116,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.log('MicrosoftFaceApi: Failed to create person.', name, err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -120,6 +129,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders('application/json')
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 			await ensureSuccessAsync(res)
 
@@ -127,6 +137,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error(`MicrosoftFaceApi: Delete person [${personId}]...OK`, err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -171,6 +183,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const body = this._createBlob(imageDataUrl)
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 
 			await ensureSuccessAsync(res)
@@ -185,6 +198,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to analyze face image.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -197,6 +212,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 
 			await ensureSuccessAsync(res)
@@ -207,6 +223,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get persons in person group.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -228,6 +246,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		})
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 
 			await ensureSuccessAsync(res)
@@ -242,6 +261,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to identify faces.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -254,6 +275,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 
 			await ensureSuccessAsync(res)
@@ -261,6 +283,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -271,11 +295,14 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 			await ensureSuccessAsync(res)
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -286,6 +313,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		const headers = this._getDefaultHeaders()
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers }), TIMEOUT)
 
 			await ensureSuccessAsync(res)
@@ -293,6 +321,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to get person.', err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 
@@ -302,6 +332,7 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		console.debug(`MicrosoftFaceApi: Add person face...`, url)
 
 		try {
+			this._onActivityDispatcher.dispatch(true)
 			const res = await withTimeout(fetch(url, { method, headers, body }), TIMEOUT)
 			await ensureSuccessAsync(res)
 			const result: AddPersonFaceResponse = await res.json()
@@ -311,6 +342,8 @@ export class MicrosoftFaceApi implements IMicrosoftFaceApi {
 		} catch (err) {
 			console.error('MicrosoftFaceApi: Failed to add person face.', url, err)
 			throw err
+		} finally {
+			this._onActivityDispatcher.dispatch(false)
 		}
 	}
 

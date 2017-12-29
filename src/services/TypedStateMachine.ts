@@ -1,4 +1,4 @@
-import mergeDeep from './utils'
+import { mergeDeep } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 
 function noopLog(msg: string): void {
