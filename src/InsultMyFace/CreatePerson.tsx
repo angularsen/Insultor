@@ -60,6 +60,9 @@ class Component extends React.Component<Props, State> {
 
 					<button type='button' className='btn btn-primary'
 						onClick={_ => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
+
+					<button type='button' className='btn btn-default'
+						onClick={_ => this.props.cancel()}>Avbryt</button>
 				</form>
 			</div>
 		)
