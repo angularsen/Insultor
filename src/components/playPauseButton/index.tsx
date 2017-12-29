@@ -11,7 +11,7 @@ export default function render(props: Props) {
 		<div style={{ position: 'relative' }}>
 			<button
 				className='btn btn-primary btn-lg'
-				style={{ position: 'absolute', top: '10em', right: '6em' }}
+				style={{ position: 'absolute', top: '15em', right: '7em' }}
 				type='button' role='button'
 				onClick={props.onStart}
 			><img style={{ width: 50, height: 50 }} src='img/logo-50p-square-white-trans.png' /> Start</button>
