@@ -465,10 +465,9 @@ export class Commentator implements Transition {
 				this._sounds.playPresenceDetectedAsync()
 				console.info('Presence was just detected, proceeding to attempt to detect faces.')
 				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
-		} else { // if (transition.transitionName === 'commentOnNextPerson_NoMoreComments') {
+		} else {
 			const personsCommentedOn = prevCycleData.personsToCommentOn
 
-			// if (prevCycleData.faces)
 			if (personsCommentedOn.length > 0 && personsCommentedOn.every(p => p.state === 'skipped')) {
 				const nicknames = personsCommentedOn.map(p => p.person.settings.nickname)
 				const nicknamesText = joinGrammatically(nicknames, ' og ')
@@ -568,13 +567,9 @@ export class Commentator implements Transition {
 
 	//#region Actions
 	private async _commentOnPersonAsync(personToCommentOn: PersonToCommentOn, idx: number, count: number): Promise<void> {
-		const personId = personToCommentOn.person.personId
-		const faceId = personToCommentOn.person.detectedFace.faceId
-
-		const comment = this._commentProvider.getCommentForPerson({
-			face: personToCommentOn.person.detectedFace.result,
-			personId,
-		})
+		const { comment, person } = personToCommentOn
+		const { personId } = person
+		const faceId = person.detectedFace.faceId
 
 		const nickname = personToCommentOn.person.settings.nickname
 		const logText = `Commenting on ${nickname ? `person ${nickname}` : `face ${faceId}`}`
