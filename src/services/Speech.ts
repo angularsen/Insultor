@@ -2,7 +2,7 @@
 const defaultOpts: ISpeechOpts = {
 	// voiceURI: 'Microsoft David Desktop - English (United States)',
 	lang: 'nb-NO',
-	rate: 1.5,
+	rate: 1.2,
 	// pitch: 0.15
 }
 
