@@ -39,7 +39,7 @@ export default class Sounds {
 
 		try {
 			console.debug('Loading audio...')
-			const allAudio = presenceDetectedSounds
+			const allAudio = presenceDetectedSounds.concat(aloneAgainSounds).concat(identifyingSounds).concat(deliverCommentSounds)
 			for (const audio of allAudio) {
 				audio.load()
 				console.debug('Loaded audio resource: ' + audio.src, audio)
