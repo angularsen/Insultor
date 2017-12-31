@@ -1,5 +1,4 @@
 import { differenceInMilliseconds } from 'date-fns'
-// Workaround for webpack --watch: https://github.com/TypeStrong/ts-loader/issues/348
 import { setTimeout } from 'timers'
 
 import { IdentifyFacesResponse } from '../../../docs/FaceAPI/IdentifyFacesResponse'
@@ -441,47 +440,60 @@ export class Commentator implements Transition {
 		this._cycleData = new DetectIdentifyCommentCycleData()
 
 		if (!this._presenceDetector.isDetected) {
+			// The person(s) are no longer around
 			console.info('User is no longer present, proceeding to not present state.')
 			this.noPresenceDetected()
 			return
-		}
-
-		// Faces detected during cycle will not have had its face identified, so do another cycle with these faces
-		const facesDetectedDuringCycle = prevCycleData.facesDetectedDuringCycle
-		if (facesDetectedDuringCycle.length > 0) {
-			console.info(`${facesDetectedDuringCycle.length} faces were detected in the meantime, immediately start identifying them.`)
-
-			// Trigger a new cycle
-			this.detectedFaces(facesDetectedDuringCycle)
-		} else {
-			console.info('User is still present, will keep trying to detect faces in the background.')
-			this._setStatus(`Er det noen andre her...?`, '😑')
 		}
 
 		// Ensure it is started, could have been stopped if last cycle went through askToCreatePerson state
 		this._faceDetector.start()
 
 		if (transition.transitionName === 'presenceDetected') {
-				this._sounds.playPresenceDetectedAsync()
-				console.info('Presence was just detected, proceeding to attempt to detect faces.')
-				this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
-		} else {
-			const personsCommentedOn = prevCycleData.personsToCommentOn
+			// Someone just appeared
+			this._sounds.playPresenceDetectedAsync()
+			console.info('Presence was just detected, proceeding to attempt to detect faces.')
+			this._setStatus('Kom litt nærmere så jeg får tatt en god titt på deg', '😁')
+			return
+		}
 
-			if (personsCommentedOn.length > 0 && personsCommentedOn.every(p => p.state === 'skipped')) {
-				const nicknames = personsCommentedOn.map(p => p.person.settings.nickname)
-				const nicknamesText = joinGrammatically(nicknames, ' og ')
-				const youText = personsCommentedOn.length > 1 ? 'Dere' : 'Du'
+		const facesDetectedDuringCycle = prevCycleData.facesDetectedDuringCycle
+		if (facesDetectedDuringCycle.length > 0) {
+			// Persons are still around and we did detect faces during last cycle, so let's identify them now
+			console.info(`${facesDetectedDuringCycle.length} faces were detected in the meantime, immediately start identifying them.`)
+			this.detectedFaces(facesDetectedDuringCycle)
+			return
+		}
 
-				// Avoid nagging on the same persons
-				this._setStatus(`${youText} er her fortsatt ja ${nicknamesText}...`, '😑')
-			} else if (prevCycleData.personsToCreate.length > 0) {
-				// There were new faces, but no comments delivered, which means they declined to join (or auto-declined)
-				this._setStatus(`Helt greit om du ikke vil bli med, men jeg spør igjen neste gang!`, '😏')
-			} else {
-				// Comments were delivered
-				this._setStatus(`Er det noen andre her..?`, '😏')
-			}
+		// Persons are still around, but we need to wait until next time faces are detected
+		console.info('User is still present, will keep trying to detect faces in the background.')
+
+		if (transition.transitionName === 'waitForThrottling_Completed') {
+			// Done waiting for throttling, let's retry
+			this._setStatus(`Ok, nok venting. Er det noen her?`, '😁')
+			return
+		}
+
+		const personsCommentedOn = prevCycleData.personsToCommentOn
+		if (personsCommentedOn.find(p => p.state === 'delivered')) {
+			// Comments were just delivered so we will wait to see if any other faces are detected
+			this._setStatus(`Er det noen andre her...?`, '😏')
+			return
+		}
+
+		if (prevCycleData.personsToCreate.length > 0 && prevCycleData.personsToCreate.every(p => p.state === 'declined')) {
+			// We did ask to create persons, but they all declined (or auto-declined)
+			this._setStatus(`Helt greit om du ikke vil bli med, men jeg spør igjen neste gang!`, '😏')
+			return
+		}
+
+		if (personsCommentedOn.length > 0 && personsCommentedOn.every(p => p.state === 'skipped')) {
+			// There were persons to comment on, but it was too early for all of them
+			const nicknames = personsCommentedOn.map(p => p.person.settings.nickname)
+			const nicknamesText = joinGrammatically(nicknames, ' og ')
+			const youText = personsCommentedOn.length > 1 ? 'Dere' : 'Du'
+
+			this._setStatus(`${youText} er her fortsatt ja ${nicknamesText}...`, '😑')
 		}
 	}
 
