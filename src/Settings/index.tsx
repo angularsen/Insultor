@@ -89,7 +89,7 @@ class Component extends React.Component<Props, State> {
 							<button className='btn btn-default' type='button' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
 						</form>
 
-						<h2>Personer</h2>
+						<h2 style={{ marginTop: '1em' }}>Legg til person</h2>
 						<form>
 							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={_ => this._updateCanAddPerson()} />
 							<div className='form-group'>
@@ -108,6 +108,7 @@ class Component extends React.Component<Props, State> {
 								onClick={_ => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
 						</form>
 
+						<h2 style={{ marginTop: '1em' }}>Personer</h2>
 						<PersonList persons={persons} deletePerson={personId => this._tryDeletePersonAsync(personId)} savePerson={person => this._updatePersonAsync(person)} />
 
 					</div>
