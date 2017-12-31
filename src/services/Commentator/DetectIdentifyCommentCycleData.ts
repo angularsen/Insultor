@@ -63,8 +63,11 @@ class DetectIdentifyCommentCycleData {
 	}
 
 	public didDeclineToCreatePerson() {
-		const personToCreate = this._getNextPersonToCreate()
-		personToCreate.state = 'declined'
+		// Decline for all remaining persons, since we are basically asking "do you want to create a person for any of the guys in this photo?"
+		const remainingPersonsToCreate = this.personsToCreate.filter(p => p.state === 'scheduled')
+		for (const remainingPerson of remainingPersonsToCreate) {
+			remainingPerson.state = 'declined'
+		}
 	}
 
 	public didTimeoutOnCreatePerson() {
