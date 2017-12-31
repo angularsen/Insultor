@@ -64,6 +64,9 @@ export interface PersonSettings {
 	nickname: string
 	jokes: string[]
 	photos: Photo[]
+	overrides?: {
+		commentCooldownMs?: number,
+	}
 }
 
 export interface Photo {

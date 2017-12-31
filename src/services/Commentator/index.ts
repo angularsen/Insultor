@@ -677,7 +677,8 @@ export class Commentator implements Transition {
 		}
 
 		const timeSinceLastMs = prevComment.spokenOn ? differenceInMilliseconds(prevComment.spokenOn, new Date()) : undefined
-		if (timeSinceLastMs === undefined || timeSinceLastMs > this._commentCooldownPerPersonMs) {
+		const cooldownMs = (person.settings.overrides && person.settings.overrides.commentCooldownMs) || this._commentCooldownPerPersonMs
+		if (timeSinceLastMs === undefined || timeSinceLastMs > cooldownMs) {
 			console.debug('OK, long enough since previous comment.', timeSinceLastMs)
 			return true
 		}
