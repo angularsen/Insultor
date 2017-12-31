@@ -688,14 +688,14 @@ export class Commentator implements Transition {
 			return true
 		}
 
-		const timeSinceLastMs = prevComment.spokenOn ? differenceInMilliseconds(prevComment.spokenOn, new Date()) : undefined
+		const timeSinceLastMs = prevComment.spokenOn ? differenceInMilliseconds(new Date(), prevComment.spokenOn) : undefined
 		const cooldownMs = (person.settings.overrides && person.settings.overrides.commentCooldownMs) || this._commentCooldownPerPersonMs
 		if (timeSinceLastMs === undefined || timeSinceLastMs > cooldownMs) {
 			console.debug('OK, long enough since previous comment.', timeSinceLastMs)
 			return true
 		}
 
-		const waitTimeText = `${Math.round((this._commentCooldownPerPersonMs - timeSinceLastMs) / 1000)} seconds`
+		const waitTimeText = `${Math.round((cooldownMs - timeSinceLastMs) / 1000)} seconds`
 		console.info(`Too early to comment on person ${person.settings.name}, need to wait at least ${waitTimeText}.`)
 		return false
 	}

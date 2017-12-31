@@ -21,7 +21,7 @@ interface AskToRegisterPersonProps {
 
 function secondsUntil(date: Date) {
 	const now = new Date()
-	return (now > date) ? 0 : differenceInSeconds(date, now)
+	return (now > date) ? 0 : differenceInSeconds(now, date)
 }
 
 class Component extends React.Component<AskToRegisterPersonProps, AskToRegisterPersonState> {
