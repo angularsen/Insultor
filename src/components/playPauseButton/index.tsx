@@ -8,10 +8,10 @@ interface Props {
 
 export default function render(props: Props) {
 	return props.canStart ? (
-		<div style={{ position: 'relative' }}>
+		<div style={{ position: 'absolute', display: 'flex', width: '100%', height: '100%' }}>
 			<button
 				className='btn btn-primary btn-lg'
-				style={{ position: 'absolute', top: '15em', right: '7em' }}
+				style={{ margin: 'auto' }}
 				type='button' role='button'
 				onClick={props.onStart}
 			><img style={{ width: 50, height: 50 }} src='img/logo-50p-square-white-trans.png' /> Start</button>
