@@ -2,7 +2,7 @@ import { setTimeout } from 'timers' // Workaround for webpack --watch: https://g
 import { ISpeech, ISpeechOpts, SpeakData } from '../Speech'
 
 export class FakeSpeech implements ISpeech {
-	public speak(text: string, opts?: ISpeechOpts): SpeakData {
+	public speakAsync(text: string, opts?: ISpeechOpts): SpeakData {
 		console.log('FakeSpeech: speaking: ' + text)
 
 		// tslint:disable-next-line:no-object-literal-type-assertion

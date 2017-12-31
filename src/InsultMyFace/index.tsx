@@ -2,14 +2,14 @@ import * as React from 'react'
 
 import Loader from '../components/loader'
 import PlayPauseButton from '../components/playPauseButton'
-import { default as Commentator, StatusInfo} from '../services/Commentator'
+import { Commentator, Sounds, StatusInfo } from '../services/Commentator'
 import CommentProvider from '../services/CommentProvider'
 import { AddPersonParams, DataStore } from '../services/DataStore'
 import { DetectedFaceWithImageData } from '../services/PeriodicFaceDetector'
 import { default as PresenceDetector } from '../services/PresenceDetector'
 import { PersonSettings } from '../services/Settings'
 import Speech from '../services/Speech'
-import { checkDefined } from '../services/utils/index'
+import { checkDefined } from '../services/utils'
 import { VideoService } from '../services/VideoService'
 
 import AskToCreatePerson from './AskToCreatePerson'
@@ -109,7 +109,8 @@ interface Props {
 }
 
 // tslint:disable-next-line:max-classes-per-file
-class Component extends React.Component<Props, State> {
+class InsultMyFace extends React.Component<Props, State> {
+	private readonly _sounds: Sounds
 	private _commentator?: Commentator
 
 	/**
@@ -143,13 +144,13 @@ class Component extends React.Component<Props, State> {
 			motionScore: 0,
 			videoHeight: VIDEO_HEIGHT,
 			videoWidth: VIDEO_WIDTH,
-			showDebug: false
+			showDebug: false,
 		}
 
 		this._onMotionScore = this._onMotionScore.bind(this)
 		this._onMotionScore = this._onMotionScore.bind(this)
-		this._startStopOnClick = this._startStopOnClick.bind(this)
 
+		this._sounds = new Sounds()
 	}
 
 	public componentDidMount() {
@@ -167,6 +168,7 @@ class Component extends React.Component<Props, State> {
 			presenceDetector,
 			speech: new Speech(),
 			videoService: new VideoService(video, faceDetectCanvas, VIDEO_WIDTH, VIDEO_HEIGHT),
+			sounds: this._sounds,
 		})
 		this._commentator = commentator
 
@@ -174,14 +176,14 @@ class Component extends React.Component<Props, State> {
 			this.setState({ motionScore })
 		})
 
-		commentator.onHasFaceApiActivity.subscribe(active => {
+		this.props.dataStore.faceApi.onActivity.subscribe(active => {
 			this.setState({ isFaceApiActive: active })
 		})
 
 		commentator.onAskToCreatePerson.subscribe(personToCreate => {
-			const viewModel : AskToCreatePersonViewModel = {
+			const viewModel: AskToCreatePersonViewModel = {
 				face: personToCreate.face,
-				type: 'askToCreatePerson'
+				type: 'askToCreatePerson',
 			}
 			this.setState({ viewModel })
 		})
@@ -201,9 +203,9 @@ class Component extends React.Component<Props, State> {
 
 		commentator.onSpeak.subscribe(commentData => {
 			const viewModel: CommentOnPersonViewModel = {
-				comment: commentData.speech.utterance.text,
-				imageDataUrl: commentData.imageDataUrl,
-				name: commentData.name,
+				comment: commentData.comment,
+				imageDataUrl: commentData.person.detectedFace.imageDataUrl,
+				name: commentData.person.settings.name,
 				type: 'commentOnPerson',
 			}
 
@@ -235,8 +237,8 @@ class Component extends React.Component<Props, State> {
 
 						<PlayPauseButton
 							canStart={canStart}
-							onStart={() => this._commentator && this._commentator.start()}
-							onStop={() => this._commentator && this._commentator.stop()} />
+							onStart={(event) => this._onClickStart(event)}
+							onStop={() => this._onClickStop()} />
 
 						<div style={{ color: 'white', background: '#111', minHeight: '92vh', width: '100%' }}>
 							{renderView(viewModel, this._commentator)}
@@ -277,16 +279,21 @@ class Component extends React.Component<Props, State> {
 		)
 	}
 
+	private _onClickStart(ev: React.MouseEvent<HTMLButtonElement>) {
+		if (this._commentator) { this._commentator.start() }
+		this._sounds.loadSoundsOnUserInteractionEvent(ev)
+	}
+
+	private _onClickStop() {
+		if (this._commentator) { this._commentator.stop() }
+	}
+
 	private videoOnCanPlay(video: HTMLVideoElement) {
 		console.debug('InsultMyFace: Video ready to play.', video)
 	}
 
 	private _onMotionScore(motionScore: number) {
 		this.setState({ motionScore })
-	}
-
-	private _startStopOnClick() {
-		if (this._commentator) { this._commentator.toggleStartStop() }
 	}
 
 	private _createEmojiStatusVm(status: StatusInfo): EmojiStatusViewModel {
@@ -299,4 +306,4 @@ class Component extends React.Component<Props, State> {
 
 }
 
-export default Component
+export default InsultMyFace

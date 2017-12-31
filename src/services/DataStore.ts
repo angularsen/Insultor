@@ -3,8 +3,7 @@ import { HttpError, IMicrosoftFaceApi } from './MicrosoftFaceApi'
 import { PersonSettings, Settings, SettingsStore } from './Settings'
 
 export interface AddPersonParams {
-	firstName: string
-	lastName: string
+	fullName: string
 	nickname: string
 	jokes: string[]
 	photoDataUrl: string
@@ -20,7 +19,7 @@ export class DataStore {
 
 	public async addPersonAsync(p: AddPersonParams): Promise<PersonSettings> {
 		console.debug(`Add person...`, p)
-		const name = `${p.firstName} ${p.lastName}`
+		const name = p.fullName
 		const createPersonRes = await this.faceApi.createPersonAsync(name)
 		const personId = createPersonRes.personId
 
@@ -45,6 +44,7 @@ export class DataStore {
 		// Add person to settings with URL to uploaded image
 		const personSettings: PersonSettings = {
 			name,
+			nickname: p.nickname,
 			jokes: ['Hei kjekken!'],
 			personId,
 			photos: [{
@@ -52,7 +52,7 @@ export class DataStore {
 				url: uploadedPhotoUrl,
 				height: p.photoHeight,
 				width: p.photoWidth,
-				personFaceId: personFace.persistedFaceId
+				personFaceId: personFace.persistedFaceId,
 			}],
 		}
 

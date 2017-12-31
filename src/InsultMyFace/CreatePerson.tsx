@@ -17,8 +17,7 @@ interface Props {
 class Component extends React.Component<Props, State> {
 	private _lastAutoFilledNickname: string = ''
 	private _selfie: Selfie | null
-	private _addFirstName: HTMLInputElement | null // Option<HTMLInputElement>
-	private _addLastName: HTMLInputElement | null // Option<HTMLInputElement>
+	private _addFullName: HTMLInputElement | null // Option<HTMLInputElement>
 	private _addNickname: HTMLInputElement | null // Option<HTMLInputElement>
 
 	constructor(props: Props) {
@@ -38,17 +37,10 @@ class Component extends React.Component<Props, State> {
 						onPhotoDataUrlChanged={_ => this._updateCanAddPerson()} />
 
 					<div className='form-group'>
-						<label htmlFor='addFirstName'>Fornavn</label>
-						<input id='addFirstName' type='text' className='form-control' placeholder='Eks: Ola'
+						<label htmlFor='addFullName'>Fornavn</label>
+						<input id='addFullName' type='text' className='form-control' placeholder='Eks: Ola'
 							onChange={ev => { this._onFirstNameChange(ev.target.value); this._updateCanAddPerson() }}
-							ref={(x) => { this._addFirstName = x/*Option.from(x)*/ }} />
-					</div>
-
-					<div className='form-group'>
-						<label htmlFor='addLastName'>Etternavn</label>
-						<input id='addLastName' type='text' className='form-control' placeholder='Eks: Nordmann'
-							onChange={_ => { this._updateCanAddPerson() }}
-							ref={(x) => this._addLastName = x/*Option.from(x)*/} />
+							ref={(x) => { this._addFullName = x/*Option.from(x)*/ }} />
 					</div>
 
 					<div className='form-group'>
@@ -69,15 +61,14 @@ class Component extends React.Component<Props, State> {
 	}
 
 	private async _createPersonAsync(): Promise<void> {
-		const firstName = this._addFirstName && this._addFirstName.value
-		const lastName = this._addLastName && this._addLastName.value
+		const fullName = this._addFullName && this._addFullName.value
 		const nickname = this._addNickname && this._addNickname.value
 
 		if (!this._selfie) {
 			alert('Fotoboks er ikke klar enda.')
 			return
 		}
-		if (!firstName || !lastName || !nickname) {
+		if (!fullName || !nickname) {
 			alert('Fyll inn alle felter først.')
 			return
 		}
@@ -88,10 +79,9 @@ class Component extends React.Component<Props, State> {
 		}
 
 		this.props.createPerson({
-			firstName,
-			jokes: ['Hei kjekken!'],
-			lastName,
+			fullName,
 			nickname,
+			jokes: ['Hei kjekken!'],
 			photoDataUrl,
 			photoHeight,
 			photoWidth,
@@ -101,7 +91,7 @@ class Component extends React.Component<Props, State> {
 	}
 
 	private _clearAddPersonFields() {
-		this._clearInputs(this._addFirstName, this._addLastName, this._addNickname)
+		this._clearInputs(this._addFullName, this._addNickname)
 	}
 
 	private _clearInputs(...inputs: Array<HTMLInputElement | null>) {
@@ -122,11 +112,10 @@ class Component extends React.Component<Props, State> {
 	}
 
 	private _updateCanAddPerson() {
-		const firstName = this._addFirstName && this._addFirstName.value
-		const lastName = this._addLastName && this._addLastName.value
+		const fullName = this._addFullName && this._addFullName.value
 		const nickname = this._addNickname && this._addNickname.value
 		const hasPhoto: boolean = (this._selfie && this._selfie.photoDataUrl) ? true : false
-		const canAddPerson = (firstName && lastName && nickname && hasPhoto) ? true : false
+		const canAddPerson = (fullName && nickname && hasPhoto) ? true : false
 		this.setState({ canAddPerson })
 	}
 

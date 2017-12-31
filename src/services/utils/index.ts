@@ -22,7 +22,7 @@ export function isObject(item: any) {
 	return (item && typeof item === 'object' && !Array.isArray(item))
 }
 
-export default function mergeDeep(target: any, source: any) {
+export function mergeDeep(target: any, source: any) {
 	const output = {...target}
 	if (isObject(target) && isObject(source)) {
 		Object.keys(source).forEach(key => {
@@ -56,6 +56,23 @@ if (!Array.prototype.distinct) {
 		} else {
 			return this.filter((elem: T, pos: number, arr: T[]) => arr.indexOf(elem) === pos)
 		}
+	}
+}
+
+export function randomItem<T>(arr: ReadonlyArray<T>) {
+	return arr[Math.floor(Math.random() * arr.length)]
+}
+
+/**
+ * Special join method that takes a final delimiter, useful for constructing
+ * a grammatically correct sentence such as "Alice, Bob and Charlie".
+ */
+export function joinGrammatically(arr: string[], finalDelimiter: string, delimiter: string = ', '): string {
+	switch (arr.length) {
+		case 0: return ''
+		case 1: return arr[0]
+		default:
+			return arr.slice(0, -1).join(delimiter) + finalDelimiter + arr[arr.length - 1]
 	}
 }
 

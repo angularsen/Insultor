@@ -1,7 +1,7 @@
 import { DetectedFaceWithImageData } from '../PeriodicFaceDetector'
-import { checkDefined } from '../utils';
+import { checkDefined } from '../utils'
 
-import { IdentifiedPerson, PersonToCreate, PersonToCommentOn } from './types';
+import { IdentifiedPerson, PersonToCommentOn, PersonToCreate } from './types'
 
 /** Holds data gathered during a detect - identify - create persons - comment cycle. */
 class DetectIdentifyCommentCycleData {
@@ -9,8 +9,8 @@ class DetectIdentifyCommentCycleData {
 		public facesToIdentify: ReadonlyArray<DetectedFaceWithImageData> = [],
 		public facesDetectedDuringCycle: ReadonlyArray<DetectedFaceWithImageData> = [],
 		public identifiedPersons: ReadonlyArray<IdentifiedPerson> = [],
-		private personsToCommentOn: ReadonlyArray<PersonToCommentOn> = [],
-		private personsToCreate: ReadonlyArray<PersonToCreate> = [],
+		public personsToCommentOn: ReadonlyArray<PersonToCommentOn> = [],
+		public personsToCreate: ReadonlyArray<PersonToCreate> = [],
 	) { }
 
 	public addPersonsToCommentOn(persons: ReadonlyArray<PersonToCommentOn>): any {
@@ -24,8 +24,13 @@ class DetectIdentifyCommentCycleData {
 		return this.personsToCreate.filter(p => p.state === 'scheduled')[0]
 	}
 
-	public getNextPersonToCommentOn(): PersonToCommentOn | undefined {
-		return this.personsToCommentOn.filter(p => p.state === 'scheduled')[0]
+	public getNextPersonToCommentOn(): { nextPerson: PersonToCommentOn | undefined, idx: number, count: number } {
+		const nextPerson = this.personsToCommentOn.filter(p => p.state === 'scheduled')[0]
+		return {
+			nextPerson,
+			idx: this.personsToCommentOn.indexOf(nextPerson),
+			count: this.personsToCommentOn.length,
+		}
 	}
 
 	public addFacesToIdentify(detectedFaces: ReadonlyArray<DetectedFaceWithImageData>): any {
@@ -82,7 +87,8 @@ class DetectIdentifyCommentCycleData {
 	}
 
 	private _getNextPersonToCommentOn() {
-		return checkDefined(this.getNextPersonToCommentOn(), 'No next person to comment on.')
+		const { nextPerson} = this.getNextPersonToCommentOn()
+		return checkDefined(nextPerson, 'No next person to comment on.')
 	}
 }
 

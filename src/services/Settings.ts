@@ -61,6 +61,7 @@ export interface PersonSettings {
 	/** Microsoft Face API - person ID */
 	personId: AAGUID
 	name: string
+	nickname: string
 	jokes: string[]
 	photos: Photo[]
 }

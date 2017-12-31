@@ -70,7 +70,7 @@ class Component extends React.Component<Props, State> {
 
 	public speak(msg: string, opts?: ISpeechOpts) {
 		this.setState({ textToSpeak: msg })
-		speech.speak(msg, opts)
+		speech.speakAsync(msg, opts)
 	}
 
 	public didWifeyAppearAndItIsMorning() {

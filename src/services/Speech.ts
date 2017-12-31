@@ -14,7 +14,7 @@ export interface ISpeechOpts {
 }
 
 export interface ISpeech {
-	speak(text: string, opts?: ISpeechOpts): SpeakData
+	speakAsync(text: string, opts?: ISpeechOpts): SpeakData
 }
 
 export interface SpeakData {
@@ -30,7 +30,7 @@ export class Speech implements ISpeech {
 		}
 	}
 
-	public speak(text: string, opts?: ISpeechOpts): SpeakData {
+	public speakAsync(text: string, opts?: ISpeechOpts): SpeakData {
 		// Note: some voices don't support altering params
 		const utter = new SpeechSynthesisUtterance()
 		const utterProps = {...defaultOpts, ...opts, text }
