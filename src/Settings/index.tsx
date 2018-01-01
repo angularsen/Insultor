@@ -71,7 +71,9 @@ class Component extends React.Component<Props, State> {
 						<form>
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub konto token</label>
-								<input id='githubToken' className='form-control'
+								<input id='githubToken'
+									className='form-control'
+									type='password'
 									defaultValue={this.settingsStore.githubApiToken}
 									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
 									onChange={ev => this._onGitHubApiTokenChange(ev.currentTarget.value)} />
@@ -79,7 +81,9 @@ class Component extends React.Component<Props, State> {
 
 							<div className='form-group'>
 								<label htmlFor='gistUrl'>GitHub repo</label>
-								<input id='gistUrl' type='url' className='form-control'
+								<input id='gistUrl'
+									type='url'
+									className='form-control'
 									defaultValue={this.settingsStore.githubRepoUrl}
 									placeholder='Eks: https://gist.github.com/{username}/{id}'
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
