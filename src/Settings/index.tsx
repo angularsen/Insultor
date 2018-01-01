@@ -12,6 +12,7 @@ import PersonList from './PersonList'
 interface State {
 	settings: Settings
 	canAddPerson: boolean
+	commentTimeoutSecondsInput: string
 }
 
 interface Props {
@@ -27,26 +28,51 @@ class Component extends React.Component<Props, State> {
 	private readonly settingsStore: SettingsStore
 
 	private readonly _onGitHubApiTokenChange = debounce((value: string) => {
-		console.info('Saved github API token to localstorage.')
+		console.info('Saved github API token.')
 		this.settingsStore.githubApiToken = value
 		this._loadSettingsAsync(true)
 	}, 1000)
 
 	private readonly _onGitHubRepoUrlChange = debounce((value: string) => {
-		console.info('Saved GitHub repo URL to localstorage.')
+		console.info('Saved GitHub repo URL.')
 		this.settingsStore.githubRepoUrl = value
 		this._loadSettingsAsync(true)
 	}, 1000)
+
+	private readonly _updateSettingsStoreDebounced = debounce(async (updateCallback: (settings: Settings) => void) => {
+		await this.settingsStore.updateSettingsAsync(updateCallback)
+	}, 1000)
+
+	private readonly _saveCommentCooldownValueIfValidDebounced = debounce((value: string) => {
+		const parsedValue = parseFloat(value)
+		if (isNaN(parsedValue)) {
+			console.error('Comment cooldown is an invalid number.', value)
+			return
+		}
+
+		const commentCooldownMs = parseFloat(parsedValue.toPrecision(2)) * 1000
+		console.log(`Save comment cooldown: parsedValue[${parsedValue}], value to store [${commentCooldownMs}]`)
+		this._updateSettings(s => s.commentCooldownPerPersonMs = commentCooldownMs)
+	}, 3000)
 
 	constructor(props: Props) {
 		super(props)
 
 		const { settingsStore } = props.dataStore
+		const initialSettings = settingsStore.currentSettingsOrDefault
 		this.settingsStore = settingsStore
 
+		settingsStore.onSettingsChanged.subscribe((settings) => {
+			this.setState({
+				settings,
+				commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(settings.commentCooldownPerPersonMs),
+			})
+		})
+
 		this.state = {
-			settings: settingsStore.currentSettingsOrDefault,
+			settings: initialSettings,
 			canAddPerson: false,
+			commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(initialSettings.commentCooldownPerPersonMs),
 		}
 
 		this._onGitHubApiTokenChange = this._onGitHubApiTokenChange.bind(this)
@@ -69,11 +95,18 @@ class Component extends React.Component<Props, State> {
 					<div className='col'>
 						<h1 className='display-4'>Instillinger</h1>
 						<form>
+							{/* Include a hidden username field to satisfy best practices for password managers etc.
+							https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#attr-fe-autocomplete-current-password */}
+							<div style={{display: 'none'}}>
+								<input type='text' autoComplete='username' />
+							</div>
+
 							<div className='form-group'>
-								<label htmlFor='githubToken'>GitHub konto token</label>
+								<label htmlFor='githubToken'>GitHub API nøkkel</label>
 								<input id='githubToken'
 									className='form-control'
 									type='password'
+									autoComplete='current-password'
 									defaultValue={this.settingsStore.githubApiToken}
 									placeholder='Eks: 93fb1ef29fc48abe915f04cd4fc8ca0dfb4f216b'
 									onChange={ev => this._onGitHubApiTokenChange(ev.currentTarget.value)} />
@@ -87,6 +120,26 @@ class Component extends React.Component<Props, State> {
 									defaultValue={this.settingsStore.githubRepoUrl}
 									placeholder='Eks: https://gist.github.com/{username}/{id}'
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
+							</div>
+
+							<div className='form-group'>
+								<label htmlFor='commentCooldownSeconds'>Minimum tid (sekunder) før ny kommentar på samme person</label>
+								<input id='commentCooldownSeconds'
+									type='number'
+									className='form-control'
+									value={this.state.commentTimeoutSecondsInput}
+									placeholder='Eks: 10'
+									onChange={ev => this._onCommentCooldownSecondsChange(ev.currentTarget.value)} />
+							</div>
+
+							<div className='form-check'>
+								<label className='form-check-label' htmlFor='askToCreatePersonForUnrecognizedFaces'>
+									<input id='askToCreatePersonForUnrecognizedFaces'
+										type='checkbox'
+										className='form-check-input'
+										checked={settings.askToCreatePersonForUnrecognizedFaces}
+										onChange={ev => this._onChangeAskToCreatePersonForUnrecognizedFaces(ev.currentTarget.checked)} />
+										Spør om å opprette nye personer</label>
 							</div>
 
 							<button className='btn btn-default' type='button' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
@@ -125,8 +178,11 @@ class Component extends React.Component<Props, State> {
 		try {
 			console.info(`Loading settings (force: ${force})...`)
 			const settings = await this.settingsStore.getSettingsAsync(force)
-			this.setState({ settings })
-			console.info(`Loading settings (force: ${force})...OK`)
+			this.setState({
+				settings,
+				commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(settings.commentCooldownPerPersonMs),
+			})
+			console.info(`Loading settings (force: ${force})...OK`, settings)
 		} catch (err) {
 			console.error('Failed to load settings.', err)
 		}
@@ -163,6 +219,15 @@ class Component extends React.Component<Props, State> {
 
 		const settings = await this.settingsStore.getSettingsAsync()
 		this.setState({ settings })
+	}
+
+	private async _updateSettings(updateCallback: (settings: Settings) => void) {
+		// Update GUI immediately for controlled inputs
+		const settingsCopy = { ...{}, ...this.state.settings }
+		updateCallback(settingsCopy)
+		this.setState({ settings: settingsCopy })
+
+		this._updateSettingsStoreDebounced(updateCallback)
 	}
 
 	private async _tryDeletePersonAsync(personId: AAGUID): Promise<void> {
@@ -205,7 +270,7 @@ class Component extends React.Component<Props, State> {
 		console.debug(`Adding ${photosWithNoFace.length} photos as person faces in Face API...`)
 
 		try {
-			for (const p of photosWithNoFace) {
+			for  (const p of photosWithNoFace) {
 				try {
 					const addedFace = await this.props.dataStore.faceApi.addPersonFaceWithUrlAsync(p.personId, p.photo.url)
 					p.photo.personFaceId = addedFace.persistedFaceId
@@ -226,7 +291,7 @@ class Component extends React.Component<Props, State> {
 	}
 
 	private _onFullNameChange(firstName: string): any {
-		if (!this._addNickname) { console.error('No nickname field, bug?'); return }
+		if  (!this._addNickname) { console.error('No nickname field, bug?');  return }
 
 		const currentNickname = this._addNickname.value.trim()
 		if (currentNickname === '' || currentNickname === this._lastAutoFilledNickname) {
@@ -241,8 +306,8 @@ class Component extends React.Component<Props, State> {
 	}
 
 	private _clearInputs(...inputs: Array<HTMLInputElement | null>) {
-		for (const input of inputs) {
-			if (input) { input.value = '' }
+		for  (const input of inputs) {
+			if  (input) { input.value = '' }
 		}
 	}
 
@@ -268,6 +333,22 @@ class Component extends React.Component<Props, State> {
 		settings.persons[personIdx] = person
 		await this.settingsStore.saveSettingsAsync(settings)
 		this.setState({ settings })
+	}
+
+	private _onChangeAskToCreatePersonForUnrecognizedFaces(checked: boolean) {
+		this._updateSettings(s => s.askToCreatePersonForUnrecognizedFaces = checked)
+	}
+
+	private _onCommentCooldownSecondsChange(value: string) {
+		// Immediately update upon typing
+		this.setState({ commentTimeoutSecondsInput: value })
+
+		// When value is no longer changing and if its' valid, store it and update GUI by settings changed event
+		this._saveCommentCooldownValueIfValidDebounced(value)
+	}
+
+	private _formatCommentCooldownSeconds(valueMs: number) {
+		return (valueMs / 1000).toPrecision(2)
 	}
 }
 

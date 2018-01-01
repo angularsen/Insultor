@@ -3,6 +3,14 @@ import { HttpError } from './MicrosoftFaceApi'
 import { b64DecodeUnicode, b64EncodeUnicode } from './utils'
 import { EventDispatcher, IEvent } from './utils/Events'
 
+function createDefaultSettings(): Settings {
+	return {
+		persons: [],
+		commentCooldownPerPersonMs: 10000,
+		askToCreatePersonForUnrecognizedFaces: true,
+	}
+}
+
 function decodeSettingsContent(settingsObj: GetFileResponse): Settings {
 	return JSON.parse(b64DecodeUnicode(settingsObj.content))
 }
@@ -55,6 +63,8 @@ export interface GetFileResponse {
 
 export interface Settings {
 	persons: PersonSettings[]
+	commentCooldownPerPersonMs: number
+	askToCreatePersonForUnrecognizedFaces: boolean
 }
 
 export interface PersonSettings {
@@ -80,12 +90,6 @@ export interface Photo {
 	personFaceId?: AAGUID
 }
 
-export function getDefaultSettings(): Settings {
-	return {
-		persons: [],
-	}
-}
-
 const localStorageKeys = {
 	settingsObject: 'settingsObject',
 }
@@ -108,7 +112,7 @@ export class SettingsStore {
 	 * Use this to synchronously read the settings instead of the async getSettings() function.
 	 */
 	public get currentSettingsOrDefault(): Settings {
-		return this._currentSettings || getDefaultSettings()
+		return this._currentSettings || createDefaultSettings()
 	}
 
 	private _currentSettings?: Settings
@@ -228,10 +232,17 @@ export class SettingsStore {
 			if (settingsObj.encoding !== 'base64') { throw new Error('Expected base64 encoding of file.') }
 
 			const settings =  decodeSettingsContent(settingsObj)
-			this._currentSettings = settings
+			this._currentSettings = { ...createDefaultSettings(), ...settings }
 			return settings
 		}
-		return getDefaultSettings()
+		return createDefaultSettings()
+	}
+
+	public async updateSettingsAsync(updateCallback: (settings: Settings) => void): Promise<Settings> {
+		const settings = await this.getSettingsAsync()
+		updateCallback(settings)
+		await this.saveSettingsAsync(settings)
+		return settings
 	}
 
 	public async saveSettingsAsync(settings: Settings): Promise<Settings> {

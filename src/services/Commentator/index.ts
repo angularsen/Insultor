@@ -157,6 +157,9 @@ export class Commentator implements Transition {
 	public get presenceDetector(): IPresenceDetector { return this._presenceDetector }
 	public get status(): StatusInfo { return this._status }
 
+	/** Current settings, or default if not yet loaded. */
+	private get settings(): Settings { return this._settingsStore.currentSettingsOrDefault }
+
 	private readonly _sm: TypedStateMachine<State, Transition>
 	private readonly _onStatusChangedDispatcher = new EventDispatcher<StatusInfo>()
 	private readonly _onSpeakDispatcher = new EventDispatcher<PersonToCommentOn>()
@@ -170,7 +173,6 @@ export class Commentator implements Transition {
 	private readonly _speech: ISpeech
 	private readonly _sounds: Sounds
 	private readonly _videoService: IVideoService
-	private readonly _commentCooldownPerPersonMs = 60 * 1000
 
 	/**
 	 * Key is personId. History of delivered comments, in order to avoid spamming comments
@@ -527,8 +529,8 @@ export class Commentator implements Transition {
 	}
 
 	private _onEnterProcessAnyNewFaces(transition: CommentatorTransition) {
-		const remainingPersonsToCreate = this._cycleData.getRemainingPersonsToCreate()
-		if (remainingPersonsToCreate.length > 0) {
+		if (this.settings.askToCreatePersonForUnrecognizedFaces &&
+				this._cycleData.getRemainingPersonsToCreate().length > 0) {
 			this.processAnyNewFaces_Next()
 		} else {
 			const personsToCommentOn = Commentator.getPersonsToCommentOn(this._cycleData.identifiedPersons, this._commentProvider)
@@ -689,14 +691,17 @@ export class Commentator implements Transition {
 		}
 
 		const timeSinceLastMs = prevComment.spokenOn ? differenceInMilliseconds(new Date(), prevComment.spokenOn) : undefined
-		const cooldownMs = (person.settings.overrides && person.settings.overrides.commentCooldownMs) || this._commentCooldownPerPersonMs
+		const cooldownMs =
+			(person.settings.overrides && person.settings.overrides.commentCooldownMs) ||
+			this.settings.commentCooldownPerPersonMs
+
 		if (timeSinceLastMs === undefined || timeSinceLastMs > cooldownMs) {
 			console.debug('OK, long enough since previous comment.', timeSinceLastMs)
 			return true
 		}
 
 		const waitTimeText = `${Math.round((cooldownMs - timeSinceLastMs) / 1000)} seconds`
-		console.info(`Too early to comment on person ${person.settings.name}, need to wait at least ${waitTimeText}.`)
+		console.info(`Too early to comment on person ${person.settings.name}, cooldown is [${cooldownMs} ms] so we need to wait at least ${waitTimeText}.`)
 		return false
 	}
 
