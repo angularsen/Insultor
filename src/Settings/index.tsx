@@ -5,7 +5,7 @@ import { debounce } from 'underscore'
 import Selfie from '../components/Selfie'
 import { DataStore } from '../services/DataStore'
 import { PersonSettings, Settings, SettingsStore } from '../services/Settings'
-import { flatten } from '../services/utils'
+import { b64DecodeUnicode, flatten } from '../services/utils'
 
 import PersonList from './PersonList'
 
@@ -17,6 +17,8 @@ interface State {
 
 interface Props {
 	dataStore: DataStore
+	/** URL search text */
+	urlSearch: string
 }
 
 class Component extends React.Component<Props, State> {
@@ -57,6 +59,22 @@ class Component extends React.Component<Props, State> {
 
 	constructor(props: Props) {
 		super(props)
+
+		console.info('Create settings.tsx', props)
+
+		const searchParams = new URLSearchParams(props.urlSearch)
+		console.debug('Search params: ', Array.from(searchParams))
+		const loadSettingsParam = searchParams.get('load_settings')
+		if (loadSettingsParam) {
+			console.info('Loading settings.')
+			console.debug('Raw load_settings: ', loadSettingsParam)
+			const parsedSettings = JSON.parse(b64DecodeUnicode(loadSettingsParam)) as Partial<{repoUrl: string, apiToken: string}>
+			console.debug('Parsed load_settings: ', parsedSettings)
+			if (parsedSettings.apiToken && parsedSettings.repoUrl) {
+				props.dataStore.settingsStore.githubApiToken = parsedSettings.apiToken
+				props.dataStore.settingsStore.githubRepoUrl = parsedSettings.repoUrl
+			}
+		}
 
 		const { settingsStore } = props.dataStore
 		const initialSettings = settingsStore.currentSettingsOrDefault
