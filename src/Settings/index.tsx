@@ -1,29 +1,39 @@
 import * as React from 'react'
-// import { Option } from 'src/services/utils/TsOption'
 import { debounce } from 'underscore'
 
 import Selfie from '../components/Selfie'
 import { DataStore } from '../services/DataStore'
 import { PersonSettings, Settings, SettingsStore } from '../services/Settings'
-import { flatten } from '../services/utils'
+import { b64DecodeUnicode, b64EncodeUnicode, ensureValidUrl, flatten } from '../services/utils'
 
 import PersonList from './PersonList'
+
+interface LoadSettingsDto {
+	repoUrl: string
+	apiToken: string
+}
 
 interface State {
 	settings: Settings
 	canAddPerson: boolean
 	commentTimeoutSecondsInput: string
+	settingsUrlForCopy?: string
 }
 
 interface Props {
 	dataStore: DataStore
+	/** URL search text */
+	urlSearch: string
 }
 
 class Component extends React.Component<Props, State> {
 	private _lastAutoFilledNickname: string = ''
 	private _selfie: Selfie | null
-	private _addFullName: HTMLInputElement | null // Option<HTMLInputElement>
-	private _addNickname: HTMLInputElement | null // Option<HTMLInputElement>
+	private _settingsUrlForCopy: HTMLInputElement | null
+	private _githubApiTokenInput: HTMLInputElement | null
+	private _githubRepoUrlInput: HTMLInputElement | null
+	private _addFullName: HTMLInputElement | null
+	private _addNickname: HTMLInputElement | null
 
 	private readonly settingsStore: SettingsStore
 
@@ -58,6 +68,27 @@ class Component extends React.Component<Props, State> {
 	constructor(props: Props) {
 		super(props)
 
+		console.info('Create settings.tsx', props)
+
+		const searchParams = new URLSearchParams(props.urlSearch)
+		console.debug('Search params: ', Array.from(searchParams))
+
+		const loadSettingsParam = searchParams.get('load_settings')
+		if (loadSettingsParam) {
+			console.info('Loading settings.')
+			console.debug('Raw load_settings: ', loadSettingsParam)
+			const parsedSettings = JSON.parse(b64DecodeUnicode(loadSettingsParam)) as Partial<LoadSettingsDto>
+			console.debug('Parsed load_settings: ', parsedSettings)
+			if (parsedSettings.apiToken && parsedSettings.repoUrl) {
+				const apiToken = parsedSettings.apiToken.trim()
+				const repoUrl = ensureValidUrl(parsedSettings.repoUrl.trim(), 'load_settings.repoUrl not a valid URL', parsedSettings)
+
+				props.dataStore.settingsStore.githubApiToken = apiToken
+				props.dataStore.settingsStore.githubRepoUrl = repoUrl
+				alert('Lastet innstillinger')
+			}
+		}
+
 		const { settingsStore } = props.dataStore
 		const initialSettings = settingsStore.currentSettingsOrDefault
 		this.settingsStore = settingsStore
@@ -88,6 +119,8 @@ class Component extends React.Component<Props, State> {
 	public render() {
 		const { settings } = this.state
 		const persons = settings && settings.persons
+		const { githubApiToken, githubRepoUrl } = this.props.dataStore.settingsStore
+		const hasSettings = githubApiToken && githubApiToken.length > 0 && githubRepoUrl && githubRepoUrl.length > 0
 
 		return (
 			<div className='container'>
@@ -104,6 +137,7 @@ class Component extends React.Component<Props, State> {
 							<div className='form-group'>
 								<label htmlFor='githubToken'>GitHub API nøkkel</label>
 								<input id='githubToken'
+									ref={x => this._githubApiTokenInput = x}
 									className='form-control'
 									type='password'
 									autoComplete='current-password'
@@ -115,6 +149,7 @@ class Component extends React.Component<Props, State> {
 							<div className='form-group'>
 								<label htmlFor='gistUrl'>GitHub repo</label>
 								<input id='gistUrl'
+									ref={x => this._githubRepoUrlInput = x}
 									type='url'
 									className='form-control'
 									defaultValue={this.settingsStore.githubRepoUrl}
@@ -122,51 +157,69 @@ class Component extends React.Component<Props, State> {
 									onChange={ev => this._onGitHubRepoUrlChange(ev.currentTarget.value)} />
 							</div>
 
-							<div className='form-group'>
-								<label htmlFor='commentCooldownSeconds'>Minimum tid (sekunder) før ny kommentar på samme person</label>
-								<input id='commentCooldownSeconds'
-									type='number'
-									className='form-control'
-									value={this.state.commentTimeoutSecondsInput}
-									placeholder='Eks: 10'
-									onChange={ev => this._onCommentCooldownSecondsChange(ev.currentTarget.value)} />
-							</div>
+							{hasSettings ? (
+								<div>
+									<div className='form-group'>
+										<label htmlFor='commentCooldownSeconds'>Minimum tid (sekunder) før ny kommentar på samme person</label>
+										<input id='commentCooldownSeconds'
+											type='number'
+											className='form-control'
+											value={this.state.commentTimeoutSecondsInput}
+											placeholder='Eks: 10'
+											onChange={ev => this._onCommentCooldownSecondsChange(ev.currentTarget.value)} />
+									</div>
 
-							<div className='form-check'>
-								<label className='form-check-label' htmlFor='askToCreatePersonForUnrecognizedFaces'>
-									<input id='askToCreatePersonForUnrecognizedFaces'
-										type='checkbox'
-										className='form-check-input'
-										checked={settings.askToCreatePersonForUnrecognizedFaces}
-										onChange={ev => this._onChangeAskToCreatePersonForUnrecognizedFaces(ev.currentTarget.checked)} />
-										Spør om å opprette nye personer</label>
-							</div>
+									<div className='form-check'>
+										<label className='form-check-label' htmlFor='askToCreatePersonForUnrecognizedFaces'>
+											<input id='askToCreatePersonForUnrecognizedFaces'
+												type='checkbox'
+												className='form-check-input'
+												checked={settings.askToCreatePersonForUnrecognizedFaces}
+												onChange={ev => this._onChangeAskToCreatePersonForUnrecognizedFaces(ev.currentTarget.checked)} />
+											Spør om å opprette nye personer</label>
+									</div>
 
-							<button className='btn btn-default' type='button' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
-							<button className='btn btn-default' type='button' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
+									<button className='btn btn-default' type='button' onClick={() => this._loadSettingsAsync(true)}>Last på nytt</button>
+									<button className='btn btn-default' type='button' onClick={() => this._addPersonFacesForPhotosWithNoFace()}>Last opp manglende fjes</button>
+									<button className='btn btn-default' type='button' onClick={() => this._exportSettingsUrl()}>Kopier URL med innstillinger</button>
+
+									{/* Input field must be visible for copy to clipboard to work, so let's put it outside the view at least */}
+									< input ref={x => this._settingsUrlForCopy = x}
+										style={{
+											position: 'absolute',
+											left: -1000,
+											top: -1000,
+										}}
+										value={this.state.settingsUrlForCopy} />
+								</div>
+							) : undefined}
 						</form>
 
-						<h2 style={{ marginTop: '1em' }}>Legg til person</h2>
-						<form>
-							<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={_ => this._updateCanAddPerson()} />
-							<div className='form-group'>
-								<label htmlFor='addFullName'>Fullt navn</label>
-								<input id='addFullName' type='text' className='form-control' placeholder='Eks: Ola'
-									onChange={ev => { this._onFullNameChange(ev.target.value); this._updateCanAddPerson() }}
-									ref={(x) => { this._addFullName = x/*Option.from(x)*/ }} />
-							</div>
-							<div className='form-group'>
-								<label htmlFor='addNickname'>Kallenavn</label>
-								<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola'
-									onChange={_ => { this._updateCanAddPerson() }}
-									ref={(x) => this._addNickname = x/*Option.from(x)*/} />
-							</div>
-							<button type='button' className='btn btn-primary'
-								onClick={_ => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
-						</form>
+						{hasSettings ? (
+							<div>
+								<h2 style={{ marginTop: '1em' }}>Legg til person</h2>
+								<form>
+									<Selfie ref={ref => this._selfie = ref} desiredWidth={1920} desiredHeight={1080} onPhotoDataUrlChanged={_ => this._updateCanAddPerson()} />
+									<div className='form-group'>
+										<label htmlFor='addFullName'>Fullt navn</label>
+										<input id='addFullName' type='text' className='form-control' placeholder='Eks: Ola'
+											onChange={ev => { this._onFullNameChange(ev.target.value); this._updateCanAddPerson() }}
+											ref={(x) => { this._addFullName = x/*Option.from(x)*/ }} />
+									</div>
+									<div className='form-group'>
+										<label htmlFor='addNickname'>Kallenavn</label>
+										<input id='addNickname' type='text' className='form-control' placeholder='Eks: Ebola'
+											onChange={_ => { this._updateCanAddPerson() }}
+											ref={(x) => this._addNickname = x/*Option.from(x)*/} />
+									</div>
+									<button type='button' className='btn btn-primary'
+										onClick={_ => this._createPersonAsync()} disabled={!this.state.canAddPerson}>Opprett person</button>
+								</form>
 
-						<h2 style={{ marginTop: '1em' }}>Personer</h2>
-						<PersonList persons={persons} deletePerson={personId => this._tryDeletePersonAsync(personId)} savePerson={person => this._updatePersonAsync(person)} />
+								<h2 style={{ marginTop: '1em' }}>Personer</h2>
+								<PersonList persons={persons} deletePerson={personId => this._tryDeletePersonAsync(personId)} savePerson={person => this._updatePersonAsync(person)} />
+
+							</div>) : undefined}
 
 					</div>
 				</div>
@@ -349,6 +402,35 @@ class Component extends React.Component<Props, State> {
 
 	private _formatCommentCooldownSeconds(valueMs: number) {
 		return (valueMs / 1000).toPrecision(2)
+	}
+
+	private _exportSettingsUrl(): void {
+		if (!this._settingsUrlForCopy) {
+			console.warn('No input field settingsUrlForCopy found.')
+			return
+		}
+
+		const { settingsStore } = this.props.dataStore
+		const { githubApiToken, githubRepoUrl } = settingsStore
+
+		if (!githubApiToken || githubApiToken.trim().length === 0 || !githubRepoUrl || githubRepoUrl.trim().length === 0) {
+			console.warn('Github API token or repo URL is not configured in settings store, so nothing to export.', { githubApiToken, githubRepoUrl })
+			alert('Fyll inn API token og repo URL først.')
+			return
+		}
+
+		const settingsDto: LoadSettingsDto = {
+			apiToken: githubApiToken,
+			repoUrl: githubRepoUrl,
+		}
+
+		const encodedSettings = b64EncodeUnicode(JSON.stringify(settingsDto))
+		const newUrl = window.location.href.split('?')[0] + `?load_settings=${encodedSettings}`
+
+		this._settingsUrlForCopy.value = newUrl
+		this._settingsUrlForCopy.select()
+		document.execCommand('copy')
+		this._settingsUrlForCopy.value = ''
 	}
 }
 

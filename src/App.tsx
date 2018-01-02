@@ -85,7 +85,7 @@ const Main: React.StatelessComponent<{}> = () => (
 		<Switch>
 			<Route exact path='/' render={() => (<InsultMyFace dataStore={dataStore} />)}/>
 			<Route exact path='/testbin' render={() => (<TestBin dataStore={dataStore} />)}/>
-			<Route exact path='/settings' render={() => (<Settings dataStore={dataStore} />)}/>
+			<Route exact path='/settings' render={(p) => (<Settings dataStore={dataStore} urlSearch={p.location.search} />)} />
 			<Route path='/about' component={About}/>
 		</Switch>
 	</main>

@@ -14,6 +14,16 @@ export function b64DecodeUnicode(str: string) {
 	}).join(''))
 }
 
+export function ensureValidUrl(url: string, msg?: string, ...optionalParams: any[]): string {
+	try {
+		// tslint:disable-next-line:no-unused-expression
+		new URL(url)
+		return url
+	} catch (err) {
+		throw new Error(msg || 'Invalid URL: ' + url)
+	}
+}
+
 export function flatten<T>(arr: T[][]) {
 	return arr.reduce((acc: T[], cur: T[]) => [...acc, ...cur], [])
 }
