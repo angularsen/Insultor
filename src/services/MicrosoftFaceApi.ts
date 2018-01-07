@@ -7,7 +7,7 @@ import { withTimeout } from './utils/'
 import { EventDispatcher, IEvent } from './utils/Events'
 
 const FACE_ATTRIBUTES = 'age,gender,headPose,smile,facialHair,glasses,emotion,hair,makeup,occlusion,accessories,blur,exposure,noise'
-const TIMEOUT = 10000
+const TIMEOUT = 20000
 
 async function ensureSuccessAsync(res: Response) {
 	if (!res.ok) {
