@@ -66,7 +66,7 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		}
 	}
 
-	private async _onDetectFacesAsync(intervalMs: number): Promise<any> {
+	private async _onDetectFacesAsync(intervalMs: number): Promise<void> {
 		if (!this._isRunning) {
 			console.info('PeriodicFaceDetector: Already stopped, returning early.')
 			return
