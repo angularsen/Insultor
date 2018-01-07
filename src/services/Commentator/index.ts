@@ -409,8 +409,6 @@ export class Commentator implements Transition {
 
 	//#region _onEnter
 	private _onEnterIdle(transition: CommentatorTransition) {
-		console.info('_onIdle')
-
 		this._setStatus('Zzzz...', '😴')
 		this._presenceDetector.stop()
 		this._videoService.stop()
@@ -421,7 +419,6 @@ export class Commentator implements Transition {
 	}
 
 	private _onEnterDetectPresence(transition: CommentatorTransition) {
-		console.info('_onDetectPresence')
 		if (transition.from === 'idle') {
 			this._setStatus('Hei.. er det noen her?', '🙂')
 			this._videoService.start()
@@ -604,7 +601,6 @@ export class Commentator implements Transition {
 	}
 
 	private async _identifyFacesAsync(detectedFaces: ReadonlyArray<DetectedFaceWithImageData>): Promise<void> {
-		console.info('_onIdentifyFacesAsync')
 		try {
 			if (!detectedFaces || detectedFaces.length === 0) {
 				throw new Error('No detected faces were given.')

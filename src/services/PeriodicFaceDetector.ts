@@ -76,7 +76,6 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 		try {
 			const detectStart = new Date()
 			console.info(`PeriodicFaceDetector: Detecting faces...`)
-			console.debug(`PeriodicFaceDetector: this._detectFacesAsync: `, this._detectFacesAsync)
 			const detectFacesResult = await this._detectFacesAsync()
 			if (detectFacesResult === undefined) { throw new Error('No detect faces result, this is likely a bug.') }
 
