@@ -6,6 +6,7 @@ import { DataStore } from '../services/DataStore'
 import { PersonSettings, Settings, SettingsStore } from '../services/Settings'
 import { b64DecodeUnicode, b64EncodeUnicode, ensureValidUrl, flatten } from '../services/utils'
 
+import { HttpError } from '../services/MicrosoftFaceApi'
 import PersonList from './PersonList'
 
 interface LoadSettingsDto {
@@ -93,27 +94,27 @@ class Component extends React.Component<Props, State> {
 		const initialSettings = settingsStore.currentSettingsOrDefault
 		this.settingsStore = settingsStore
 
-		settingsStore.onSettingsChanged.subscribe((settings) => {
-			this.setState({
-				settings,
-				commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(settings.commentCooldownPerPersonMs),
-			})
-		})
+		this._onGitHubApiTokenChange = this._onGitHubApiTokenChange.bind(this)
+		this._onGitHubRepoUrlChange = this._onGitHubRepoUrlChange.bind(this)
+		this._loadSettingsAsync = this._loadSettingsAsync.bind(this)
+		this._onSettingsChanged = this._onSettingsChanged.bind(this)
+
+		settingsStore.onSettingsChanged.subscribe(this._onSettingsChanged)
 
 		this.state = {
 			settings: initialSettings,
 			canAddPerson: false,
 			commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(initialSettings.commentCooldownPerPersonMs),
 		}
-
-		this._onGitHubApiTokenChange = this._onGitHubApiTokenChange.bind(this)
-		this._onGitHubRepoUrlChange = this._onGitHubRepoUrlChange.bind(this)
-		this._loadSettingsAsync = this._loadSettingsAsync.bind(this)
 	}
 
 	public componentDidMount() {
 		// Can't await here
 		this._loadSettingsAsync()
+	}
+
+	public componentWillUnmount() {
+		this.settingsStore.onSettingsChanged.unsubscribe(this._onSettingsChanged)
 	}
 
 	public render() {
@@ -230,14 +231,23 @@ class Component extends React.Component<Props, State> {
 	private async _loadSettingsAsync(force = false): Promise<void> {
 		try {
 			console.info(`Loading settings (force: ${force})...`)
+
+			// State is updated in _onSettingsChanged handler
 			const settings = await this.settingsStore.getSettingsAsync(force)
-			this.setState({
-				settings,
-				commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(settings.commentCooldownPerPersonMs),
-			})
+
 			console.info(`Loading settings (force: ${force})...OK`, settings)
 		} catch (err) {
 			console.error('Failed to load settings.', err)
+
+			if (err instanceof HttpError) {
+				if (err.statusCode === 404) {
+					alert('Fant ikke innstillinger, sjekk API token og repo URL:\n\n' + err)
+					return
+				}
+			}
+
+			alert('Klarte ikke å laste innstillinger:\n\n' + err)
+			return
 		}
 	}
 
@@ -432,6 +442,14 @@ class Component extends React.Component<Props, State> {
 		document.execCommand('copy')
 		this._settingsUrlForCopy.value = ''
 	}
+
+	private _onSettingsChanged(settings: Settings) {
+		this.setState({
+			settings,
+			commentTimeoutSecondsInput: this._formatCommentCooldownSeconds(settings.commentCooldownPerPersonMs),
+		})
+	}
+
 }
 
 export default Component
