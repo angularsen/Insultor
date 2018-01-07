@@ -96,7 +96,6 @@ export class PeriodicFaceDetector implements IPeriodicFaceDetector {
 			console.debug(`PeriodicFaceDetector: Last request took ${durationMs} ms, waiting ${timeToWaitMs} ms until next time.`)
 		} catch (err) {
 			console.error('Failed to periodically detect faces. Will keep trying..', error(err))
-			return undefined
 		} finally {
 			console.debug(`PeriodicFaceDetector: Queue next detect faces in ${timeToWaitMs} ms.`)
 		}
