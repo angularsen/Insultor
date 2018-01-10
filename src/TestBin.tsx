@@ -11,6 +11,7 @@ const speech = new Speech()
 interface State {
 	error?: string
 	textToSpeak?: string
+	giphy?: { url: string, width: number, height: number }
 }
 
 interface Props {
@@ -21,13 +22,38 @@ class Component extends React.Component<Props, State> {
 	private readonly _faceApi: MicrosoftFaceApi = new MicrosoftFaceApi(
 			faceApiConfig.myPersonalSubscriptionKey,
 			faceApiConfig.endpoint,
-			faceApiConfig.webstepPersonGroupId)
+		faceApiConfig.webstepPersonGroupId)
 
 	constructor(props: Props) {
 		super(props)
 
-		this.state = {
-		}
+		this.state = {}
+
+		setTimeout(async () => {
+			try {
+				const tag = 'whatever'
+				const rating = 'G'
+				const apiKey = 'CE066K8JacgmO6K1xyrac9qpOTg2d6Fd'
+
+				const res = await fetch(`https://api.giphy.com/v1/gifs/random?api_key=${apiKey}&tag=${tag}&rating=${rating}`)
+				if (!res.ok) {
+					console.error('Failed to fetch.', res)
+					return
+				}
+
+				const body = await res.json()
+				this.setState({
+					giphy: {
+						url: body.data.fixed_width_downsampled_url,
+						width: body.data.fixed_width_downsampled_width,
+						height: body.data.fixed_width_downsampled_height,
+					},
+				})
+			} catch (err) {
+				console.error('Failed to fetch.', err)
+				return
+			}
+		})
 	}
 
 	public render() {
@@ -40,6 +66,13 @@ class Component extends React.Component<Props, State> {
 				<div className='row'>
 					<div className='col'>
 						<h1 className='display-4'>TestBin</h1>
+						{
+							this.state.giphy ? (
+								<div>
+									<img src={this.state.giphy.url} width='100%' />
+								</div>
+							) : undefined
+						}
 						<div>
 							<button style={buttonStyle} onClick={_ => this.speakRandomJoke()}>Insult me now!</button>
 							<button style={buttonStyle} onClick={_ => this.didWifeyAppearAndItIsMorning()}>Wifey appears in the morning</button>
